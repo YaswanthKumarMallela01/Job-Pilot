@@ -89,6 +89,18 @@ export default function JobsPage() {
     setUpdatingIds(prev => { const next = new Set(prev); next.delete(jobId); return next; });
   };
 
+  // ─── Delete Job ───────────────────────────────────────────
+  const handleDelete = async (jobId: string) => {
+    try {
+      const res = await fetch(`/api/jobs/${jobId}`, { method: 'DELETE' });
+      if (res.ok) {
+        setJobs(prev => prev.filter(job => job.id !== jobId));
+      }
+    } catch (err) {
+      console.error('Delete error:', err);
+    }
+  };
+
   // ─── Export to CSV ─────────────────────────────────────────
   const handleExportCSV = () => {
     const headers = ['Title', 'Company', 'Location', 'Source', 'Status', 'Date Found', 'Job URL', 'Notes'];
@@ -205,7 +217,7 @@ export default function JobsPage() {
 
       {/* Jobs display */}
       {viewMode === 'table' ? (
-        <JobTable jobs={filteredJobs} onStatusChange={handleStatusChange} updatingIds={updatingIds} />
+        <JobTable jobs={filteredJobs} onStatusChange={handleStatusChange} onDelete={handleDelete} updatingIds={updatingIds} />
       ) : (
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {filteredJobs.length === 0 ? (
@@ -218,7 +230,7 @@ export default function JobsPage() {
             </div>
           ) : (
             filteredJobs.map(job => (
-              <JobCard key={job.id} job={job} onStatusChange={handleStatusChange} isUpdating={updatingIds.has(job.id)} />
+              <JobCard key={job.id} job={job} onStatusChange={handleStatusChange} onDelete={handleDelete} isUpdating={updatingIds.has(job.id)} />
             ))
           )}
         </div>

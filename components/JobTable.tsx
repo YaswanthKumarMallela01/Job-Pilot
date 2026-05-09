@@ -6,6 +6,7 @@ import StatusDropdown from './StatusDropdown';
 interface JobTableProps {
   jobs: Job[];
   onStatusChange: (jobId: string, status: JobStatus) => void;
+  onDelete: (jobId: string) => void;
   updatingIds: Set<string>;
 }
 
@@ -20,7 +21,7 @@ const SOURCE_BADGE: Record<JobSource, { label: string; classes: string }> = {
   unstop: { label: 'Unstop', classes: 'bg-rose-500/10 text-rose-400' },
 };
 
-export default function JobTable({ jobs, onStatusChange, updatingIds }: JobTableProps) {
+export default function JobTable({ jobs, onStatusChange, onDelete, updatingIds }: JobTableProps) {
   if (jobs.length === 0) {
     return (
       <div className="flex flex-col items-center justify-center rounded-2xl border border-white/[0.06] bg-[#12121f]/40 py-20 px-6">
@@ -48,6 +49,7 @@ export default function JobTable({ jobs, onStatusChange, updatingIds }: JobTable
             <th className="px-5 py-3.5 text-left text-xs font-semibold uppercase tracking-wider text-slate-500 hidden lg:table-cell">Date</th>
             <th className="px-5 py-3.5 text-left text-xs font-semibold uppercase tracking-wider text-slate-500">Status</th>
             <th className="px-5 py-3.5 text-left text-xs font-semibold uppercase tracking-wider text-slate-500">Link</th>
+            <th className="px-5 py-3.5 text-center text-xs font-semibold uppercase tracking-wider text-slate-500 w-12"></th>
           </tr>
         </thead>
         <tbody className="divide-y divide-white/[0.04]">
@@ -56,7 +58,7 @@ export default function JobTable({ jobs, onStatusChange, updatingIds }: JobTable
             return (
               <tr
                 key={job.id}
-                className="transition-colors hover:bg-white/[0.02]"
+                className="group transition-colors hover:bg-white/[0.02]"
               >
                 <td className="px-5 py-4">
                   <span className="text-sm font-medium text-white">{job.title}</span>
@@ -92,6 +94,20 @@ export default function JobTable({ jobs, onStatusChange, updatingIds }: JobTable
                       <line x1="10" y1="14" x2="21" y2="3" />
                     </svg>
                   </a>
+                </td>
+                <td className="px-3 py-4 text-center">
+                  <button
+                    onClick={() => {
+                      if (confirm('Delete this job?')) onDelete(job.id);
+                    }}
+                    className="opacity-0 group-hover:opacity-100 transition-opacity p-1.5 rounded-lg bg-red-500/10 text-red-400 hover:bg-red-500/20 hover:text-red-300"
+                    title="Delete job"
+                  >
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <polyline points="3 6 5 6 21 6" />
+                      <path d="M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2" />
+                    </svg>
+                  </button>
                 </td>
               </tr>
             );

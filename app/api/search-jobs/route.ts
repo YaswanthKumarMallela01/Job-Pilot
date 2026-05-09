@@ -67,26 +67,26 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    // Send email digest with all found jobs (new + existing recent)
+    // Send email digest with all found jobs — ALWAYS send when Search Jobs Now is pressed
     let emailSent = false;
-    if (userPrefs.email_digest_enabled && userPrefs.email) {
+    const recipientEmail = userPrefs.email || process.env.RECIPIENT_EMAIL;
+    if (recipientEmail) {
       try {
-        // Send email with all the jobs that were found (not just new)
         const jobsForEmail: RawJob[] = rawJobs.slice(0, 50);
         if (jobsForEmail.length > 0) {
-          await sendDigestEmail(userPrefs.email, jobsForEmail);
-          emailSent = true;
+          const result = await sendDigestEmail(recipientEmail, jobsForEmail);
+          emailSent = result.success;
 
           // Log the email
           await supabase.from('email_logs').insert({
             user_id,
-            status: 'success',
+            status: result.success ? 'success' : 'failed',
             jobs_count: jobsForEmail.length,
+            error_message: result.error || null,
           });
         }
       } catch (emailErr) {
         console.error('Email send error:', emailErr);
-        // Log the failure but don't fail the whole request
         await supabase.from('email_logs').insert({
           user_id,
           status: 'failed',

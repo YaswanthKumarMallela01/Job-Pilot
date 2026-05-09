@@ -239,16 +239,47 @@ export async function fetchUnstopJobs(keyword: string): Promise<RawJob[]> {
     const data = await res.json();
     const opportunities = data?.data?.data || [];
     if (!Array.isArray(opportunities)) return [];
+
+    // Keyword parts for relevance filtering (e.g. "Software Engineer" -> ["software", "engineer"])
+    const keywordParts = keyword.toLowerCase().split(/\s+/);
+
     return opportunities
-      .filter((opp: Record<string, unknown>) => opp.title && (opp.seo_url || opp.id))
-      .map((opp: Record<string, unknown>) => ({
-        title: String(opp.title || '').trim(),
-        company: String((opp.organisation as Record<string, unknown>)?.name || opp.organisation || 'Unknown').trim(),
-        location: String(opp.city || opp.location || 'India').trim(),
-        source: 'unstop' as const,
-        job_url: opp.seo_url ? `https://unstop.com/${opp.seo_url}` : `https://unstop.com/job/${opp.id}`,
-        description: String(opp.short_desc || opp.desc || '').replace(/<[^>]*>/g, '').trim().substring(0, 500),
-      }));
+      .filter((opp: Record<string, unknown>) => {
+        if (!opp.title) return false;
+        // Only include jobs whose title contains at least one keyword word
+        const title = String(opp.title).toLowerCase();
+        return keywordParts.some(part => title.includes(part));
+      })
+      .map((opp: Record<string, unknown>) => {
+        // Extract city from locations array
+        const locations = Array.isArray(opp.locations) ? opp.locations : [];
+        const cityName = locations.length > 0
+          ? (locations as Array<Record<string, unknown>>).map(l => `${l.city || ''}, ${l.country || ''}`).join('; ').trim()
+          : 'India';
+
+        // seo_url already contains the full URL like "https://unstop.com/jobs/..."
+        const seoUrl = String(opp.seo_url || '');
+        const shortUrl = String(opp.short_url || '');
+        const publicUrl = String(opp.public_url || '');
+        // Use seo_url directly if it starts with http, otherwise build from public_url
+        const jobUrl = seoUrl.startsWith('http') ? seoUrl
+          : shortUrl.startsWith('http') ? shortUrl
+          : publicUrl ? `https://unstop.com/${publicUrl}`
+          : `https://unstop.com/jobs`;
+
+        return {
+          title: String(opp.title || '').trim(),
+          company: String(
+            (typeof opp.organisation === 'object' && opp.organisation !== null
+              ? (opp.organisation as Record<string, unknown>).name
+              : opp.organisation) || 'Unknown'
+          ).trim(),
+          location: cityName || 'India',
+          source: 'unstop' as const,
+          job_url: jobUrl,
+          description: String(opp.details || opp.short_desc || '').replace(/<[^>]*>/g, '').replace(/\\n/g, ' ').trim().substring(0, 500),
+        };
+      });
   } catch (err) { console.error('Unstop fetch error:', err); return []; }
 }
 
@@ -286,11 +317,21 @@ export async function fetchAllJobs(keywords: string[], location: string): Promis
     return true;
   });
 
-  // Filter by location preference
-  const filtered = deduped.filter(job => locationMatches(job.location, locationStr));
+  // Filter by keyword relevance — job title must contain at least one keyword word
+  const allKeywordParts = keywords.flatMap(k => k.toLowerCase().split(/\s+/)).filter(p => p.length > 2);
+  const keywordFiltered = deduped.filter(job => {
+    const title = (job.title || '').toLowerCase();
+    const desc = (job.description || '').toLowerCase();
+    return allKeywordParts.some(part => title.includes(part) || desc.includes(part));
+  });
 
-  // If filtering removed too many, fall back to all deduped results
-  const result = filtered.length >= 5 ? filtered : deduped;
+  // Filter by location preference
+  const locationFiltered = keywordFiltered.filter(job => locationMatches(job.location, locationStr));
+
+  // Use keyword-filtered if we have enough, otherwise fall back to all deduped
+  const result = locationFiltered.length >= 5 ? locationFiltered
+    : keywordFiltered.length >= 5 ? keywordFiltered
+    : deduped;
 
   // Cap at MAX_JOBS
   return result.slice(0, MAX_JOBS);

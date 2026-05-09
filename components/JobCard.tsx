@@ -6,6 +6,7 @@ import StatusDropdown from './StatusDropdown';
 interface JobCardProps {
   job: Job;
   onStatusChange: (jobId: string, status: JobStatus) => void;
+  onDelete: (jobId: string) => void;
   isUpdating?: boolean;
 }
 
@@ -20,7 +21,7 @@ const SOURCE_BADGE: Record<JobSource, { label: string; classes: string }> = {
   unstop: { label: 'Unstop', classes: 'bg-rose-500/10 text-rose-400 border-rose-500/20' },
 };
 
-export default function JobCard({ job, onStatusChange, isUpdating }: JobCardProps) {
+export default function JobCard({ job, onStatusChange, onDelete, isUpdating }: JobCardProps) {
   const sourceBadge = SOURCE_BADGE[job.source] || {
     label: job.source,
     classes: 'bg-slate-500/10 text-slate-400 border-slate-500/20',
@@ -34,6 +35,20 @@ export default function JobCard({ job, onStatusChange, isUpdating }: JobCardProp
 
   return (
     <div className="group relative rounded-2xl border border-white/[0.06] bg-[#12121f]/60 p-5 transition-all duration-300 hover:border-indigo-500/20 hover:bg-[#16162a]/80 hover:shadow-lg hover:shadow-indigo-500/[0.03]">
+      {/* Delete button — top right */}
+      <button
+        onClick={() => {
+          if (confirm('Delete this job?')) onDelete(job.id);
+        }}
+        className="absolute top-3 right-3 opacity-0 group-hover:opacity-100 transition-opacity p-1.5 rounded-lg bg-red-500/10 text-red-400 hover:bg-red-500/20 hover:text-red-300"
+        title="Delete job"
+      >
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <polyline points="3 6 5 6 21 6" />
+          <path d="M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2" />
+        </svg>
+      </button>
+
       {/* Top row: Source + Date */}
       <div className="mb-3 flex items-center justify-between">
         <span className={`inline-flex items-center rounded-full border px-2.5 py-0.5 text-[11px] font-semibold uppercase tracking-wider ${sourceBadge.classes}`}>
