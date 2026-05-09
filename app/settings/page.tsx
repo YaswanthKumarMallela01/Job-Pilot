@@ -100,6 +100,43 @@ export default function SettingsPage() {
           {saving ? 'Saving...' : 'Save Preferences'}
         </button>
       </form>
+
+      {/* Danger Zone: Delete Account */}
+      <div className="mt-12 rounded-2xl border border-red-500/20 bg-red-500/5 p-5">
+        <h2 className="text-lg font-bold text-red-400 mb-1">Danger Zone</h2>
+        <p className="text-xs text-slate-400 mb-4">Once you delete your account, all your data (jobs, preferences, email logs) will be permanently removed. This cannot be undone.</p>
+        <button
+          onClick={async () => {
+            if (!confirm('Are you sure you want to delete your account? This action is PERMANENT and cannot be undone.')) return;
+            if (!confirm('This will delete ALL your saved jobs, preferences, and email logs. Type OK to proceed.')) return;
+
+            try {
+              const supabase = getSupabase();
+              const { data: { user } } = await supabase.auth.getUser();
+              if (!user) return;
+
+              const res = await fetch('/api/delete-account', {
+                method: 'DELETE',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ user_id: user.id }),
+              });
+
+              if (res.ok) {
+                await supabase.auth.signOut();
+                router.push('/');
+              } else {
+                const data = await res.json();
+                alert(data.error || 'Failed to delete account.');
+              }
+            } catch {
+              alert('An error occurred while deleting your account.');
+            }
+          }}
+          className="rounded-xl border border-red-500/30 bg-red-500/10 px-5 py-2.5 text-sm font-semibold text-red-400 hover:bg-red-500/20 hover:text-red-300 transition-all"
+        >
+          Delete My Account
+        </button>
+      </div>
     </div>
   );
 }

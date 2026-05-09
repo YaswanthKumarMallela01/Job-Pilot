@@ -331,56 +331,103 @@ export async function fetchUnstopJobs(keyword: string): Promise<RawJob[]> {
   } catch (err) { console.error('Unstop fetch error:', err); return []; }
 }
 
-// ─── Fetch all jobs — filtered by preferences, capped at 50 ─
+// ─── Fetch all jobs — balanced distribution, capped at 50, day-based rotation ─
 export async function fetchAllJobs(keywords: string[], location: string): Promise<RawJob[]> {
-  const allJobs: RawJob[] = [];
-  // Parse location for filtering
   const locationStr = location || 'India, Remote';
+
+  // Day-based offset: rotate through pages so each day returns different results
+  const dayOfYear = Math.floor((Date.now() - new Date(new Date().getFullYear(), 0, 0).getTime()) / 86400000);
+  const pageOffset = (dayOfYear % 5); // Cycle through 5 pages (0-4)
+
+  const linkedInJobs: RawJob[] = [];
+  const unstopJobs: RawJob[] = [];
+  const otherJobs: RawJob[] = [];
 
   for (const keyword of keywords) {
     const results = await Promise.all([
       fetchLinkedInJobs(keyword, locationStr),
+      fetchUnstopJobs(keyword),
+      // Other sources
       fetchIndeedJobs(keyword, locationStr),
       fetchRemoteOKJobs(keyword),
       fetchArbeitnowJobs(keyword, locationStr),
       fetchJobicyJobs(keyword),
       fetchAdzunaJobs(keyword, locationStr),
       fetchTheMuseJobs(keyword, locationStr),
-      fetchUnstopJobs(keyword),
     ]);
 
-    for (const jobs of results) {
-      allJobs.push(...jobs);
+    linkedInJobs.push(...results[0]);
+    unstopJobs.push(...results[1]);
+    for (let i = 2; i < results.length; i++) {
+      otherJobs.push(...results[i]);
     }
-
-    // Early exit if we already have enough
-    if (allJobs.length >= MAX_JOBS * 2) break;
   }
 
-  // Deduplicate by job URL
-  const seen = new Set<string>();
-  const deduped = allJobs.filter((job) => {
-    if (!job.job_url || seen.has(job.job_url)) return false;
-    seen.add(job.job_url);
+  // Deduplicate within each source group
+  const dedup = (jobs: RawJob[]): RawJob[] => {
+    const seen = new Set<string>();
+    return jobs.filter(j => {
+      if (!j.job_url || seen.has(j.job_url)) return false;
+      seen.add(j.job_url);
+      return true;
+    });
+  };
+
+  const dedupedLinkedIn = dedup(linkedInJobs);
+  const dedupedUnstop = dedup(unstopJobs);
+  const dedupedOther = dedup(otherJobs);
+
+  // Apply day-based offset for rotation — skip (offset * 20) jobs from each source
+  const offsetLinkedIn = dedupedLinkedIn.slice(pageOffset * 5);
+  const offsetUnstop = dedupedUnstop.slice(pageOffset * 3);
+  const offsetOther = dedupedOther.slice(pageOffset * 2);
+
+  // Keyword relevance filter
+  const allKeywordParts = keywords.flatMap(k => k.toLowerCase().split(/\s+/)).filter(p => p.length > 2);
+  const filterRelevant = (jobs: RawJob[]): RawJob[] => {
+    if (allKeywordParts.length === 0) return jobs;
+    return jobs.filter(job => {
+      const title = (job.title || '').toLowerCase();
+      const desc = (job.description || '').toLowerCase();
+      return allKeywordParts.some(part => title.includes(part) || desc.includes(part));
+    });
+  };
+
+  // Apply relevance filter
+  const relevantLinkedIn = filterRelevant(offsetLinkedIn);
+  const relevantUnstop = filterRelevant(offsetUnstop);
+  const relevantOther = filterRelevant(offsetOther);
+
+  // Balanced distribution: 20 LinkedIn, 20 Unstop, 10 Others
+  const LINKEDIN_QUOTA = 20;
+  const UNSTOP_QUOTA = 20;
+  const OTHER_QUOTA = MAX_JOBS - LINKEDIN_QUOTA - UNSTOP_QUOTA;
+
+  const selectedLinkedIn = relevantLinkedIn.slice(0, LINKEDIN_QUOTA);
+  const selectedUnstop = relevantUnstop.slice(0, UNSTOP_QUOTA);
+  const selectedOther = relevantOther.slice(0, OTHER_QUOTA);
+
+  // Combine and fill remaining slots
+  const combined = [...selectedLinkedIn, ...selectedUnstop, ...selectedOther];
+
+  // If any source has fewer results, fill from others
+  const remaining = MAX_JOBS - combined.length;
+  if (remaining > 0) {
+    const usedUrls = new Set(combined.map(j => j.job_url));
+    const extras = [...relevantLinkedIn, ...relevantUnstop, ...relevantOther]
+      .filter(j => !usedUrls.has(j.job_url))
+      .slice(0, remaining);
+    combined.push(...extras);
+  }
+
+  // Final deduplication across all sources
+  const finalSeen = new Set<string>();
+  const final = combined.filter(j => {
+    if (!j.job_url || finalSeen.has(j.job_url)) return false;
+    finalSeen.add(j.job_url);
     return true;
   });
 
-  // Filter by keyword relevance — job title must contain at least one keyword word
-  const allKeywordParts = keywords.flatMap(k => k.toLowerCase().split(/\s+/)).filter(p => p.length > 2);
-  const keywordFiltered = deduped.filter(job => {
-    const title = (job.title || '').toLowerCase();
-    const desc = (job.description || '').toLowerCase();
-    return allKeywordParts.some(part => title.includes(part) || desc.includes(part));
-  });
-
-  // Filter by location preference
-  const locationFiltered = keywordFiltered.filter(job => locationMatches(job.location, locationStr));
-
-  // Use keyword-filtered if we have enough, otherwise fall back to all deduped
-  const result = locationFiltered.length >= 5 ? locationFiltered
-    : keywordFiltered.length >= 5 ? keywordFiltered
-    : deduped;
-
-  // Cap at MAX_JOBS
-  return result.slice(0, MAX_JOBS);
+  return final.slice(0, MAX_JOBS);
 }
+
