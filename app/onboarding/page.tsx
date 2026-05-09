@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { getSupabase } from '@/lib/supabase';
+import type { ExperienceLevel } from '@/lib/types';
 
 const POPULAR_KEYWORDS = [
   'Software Engineer', 'Data Analyst', 'Frontend Developer', 'Backend Developer',
@@ -17,6 +18,14 @@ const POPULAR_LOCATIONS = [
   'New York', 'San Francisco', 'London', 'Singapore', 'Dubai',
 ];
 
+const EXPERIENCE_OPTIONS: { value: ExperienceLevel; label: string; desc: string; icon: string }[] = [
+  { value: 'internship', label: 'Internship', desc: 'Student or fresh graduate', icon: '🎓' },
+  { value: 'entry', label: 'Entry Level', desc: '0-2 years experience', icon: '🌱' },
+  { value: 'mid', label: 'Mid Level', desc: '3-5 years experience', icon: '💼' },
+  { value: 'senior', label: 'Senior Level', desc: '5+ years experience', icon: '🚀' },
+  { value: 'any', label: 'Any Level', desc: 'Show all experience levels', icon: '🌐' },
+];
+
 export default function OnboardingPage() {
   const router = useRouter();
   const [step, setStep] = useState(1);
@@ -24,6 +33,7 @@ export default function OnboardingPage() {
   const [customKeyword, setCustomKeyword] = useState('');
   const [selectedLocations, setSelectedLocations] = useState<string[]>([]);
   const [customLocation, setCustomLocation] = useState('');
+  const [experienceLevel, setExperienceLevel] = useState<ExperienceLevel>('any');
   const [email, setEmail] = useState('');
   const [emailDigest, setEmailDigest] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -83,6 +93,7 @@ export default function OnboardingPage() {
         user_id: user.id,
         keywords: selectedKeywords,
         location: locationStr,
+        experience_level: experienceLevel,
         email: email || user.email,
         email_digest_enabled: emailDigest,
       });
@@ -97,6 +108,8 @@ export default function OnboardingPage() {
     }
   };
 
+  const totalSteps = 4;
+
   return (
     <div className="flex min-h-[calc(100vh-4rem)] items-center justify-center px-4 py-12">
       <div className="pointer-events-none absolute inset-0 overflow-hidden">
@@ -106,12 +119,12 @@ export default function OnboardingPage() {
       <div className="relative w-full max-w-2xl">
         {/* Progress indicator */}
         <div className="mb-8 flex items-center justify-center gap-2">
-          {[1, 2, 3].map(s => (
+          {[1, 2, 3, 4].map(s => (
             <div key={s} className="flex items-center gap-2">
               <div className={`flex h-8 w-8 items-center justify-center rounded-full text-xs font-bold transition-all ${
                 step >= s ? 'bg-indigo-500 text-white' : 'bg-white/[0.06] text-slate-500'
               }`}>{s}</div>
-              {s < 3 && <div className={`h-0.5 w-12 rounded-full transition-all ${step > s ? 'bg-indigo-500' : 'bg-white/[0.06]'}`} />}
+              {s < totalSteps && <div className={`h-0.5 w-10 rounded-full transition-all ${step > s ? 'bg-indigo-500' : 'bg-white/[0.06]'}`} />}
             </div>
           ))}
         </div>
@@ -123,7 +136,7 @@ export default function OnboardingPage() {
           {step === 1 && (
             <div>
               <h1 className="text-2xl font-bold text-white mb-2">What jobs are you looking for?</h1>
-              <p className="text-sm text-slate-400 mb-6">Select your target roles or add custom ones. You can change these later in Settings.</p>
+              <p className="text-sm text-slate-400 mb-6">Select your target roles or add custom ones.</p>
 
               <div className="flex flex-wrap gap-2 mb-4">
                 {POPULAR_KEYWORDS.map(kw => (
@@ -157,7 +170,7 @@ export default function OnboardingPage() {
           {step === 2 && (
             <div>
               <h1 className="text-2xl font-bold text-white mb-2">Where do you want to work?</h1>
-              <p className="text-sm text-slate-400 mb-6">Select one or more locations. You can pick multiple!</p>
+              <p className="text-sm text-slate-400 mb-6">Select one or more locations.</p>
 
               <div className="flex flex-wrap gap-2 mb-4">
                 {POPULAR_LOCATIONS.map(loc => (
@@ -171,8 +184,7 @@ export default function OnboardingPage() {
               </div>
 
               <div className="flex gap-2 mb-4">
-                <input value={customLocation} onChange={e => setCustomLocation(e.target.value)}
-                  onKeyDown={e => e.key === 'Enter' && addCustomLocation()}
+                <input value={customLocation} onChange={e => setCustomLocation(e.target.value)} onKeyDown={e => e.key === 'Enter' && addCustomLocation()}
                   placeholder="Add custom location..." className="flex-1 rounded-xl border border-white/[0.06] bg-white/[0.03] px-4 py-2.5 text-sm text-white placeholder-slate-500 outline-none focus:border-indigo-500/40 focus:ring-2 focus:ring-indigo-500/20" />
                 <button onClick={addCustomLocation} className="rounded-xl bg-white/[0.06] px-4 py-2.5 text-sm font-medium text-slate-300 hover:bg-white/[0.1] transition-all">Add</button>
               </div>
@@ -191,11 +203,49 @@ export default function OnboardingPage() {
             </div>
           )}
 
-          {/* Step 3: Email Digest */}
+          {/* Step 3: Experience Level */}
           {step === 3 && (
             <div>
+              <h1 className="text-2xl font-bold text-white mb-2">What&apos;s your experience level?</h1>
+              <p className="text-sm text-slate-400 mb-6">This helps us find the right jobs for you.</p>
+
+              <div className="space-y-3 mb-6">
+                {EXPERIENCE_OPTIONS.map(opt => (
+                  <button key={opt.value} onClick={() => setExperienceLevel(opt.value)}
+                    className={`w-full flex items-center gap-4 rounded-2xl border p-4 text-left transition-all ${
+                      experienceLevel === opt.value
+                        ? 'bg-indigo-500/10 border-indigo-500/30 shadow-lg shadow-indigo-500/10'
+                        : 'bg-white/[0.02] border-white/[0.06] hover:bg-white/[0.04]'
+                    }`}>
+                    <span className="text-2xl">{opt.icon}</span>
+                    <div>
+                      <p className={`text-sm font-semibold ${experienceLevel === opt.value ? 'text-indigo-300' : 'text-white'}`}>{opt.label}</p>
+                      <p className="text-xs text-slate-500">{opt.desc}</p>
+                    </div>
+                    {experienceLevel === opt.value && (
+                      <svg className="ml-auto text-indigo-400" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+                        <polyline points="20 6 9 17 4 12" />
+                      </svg>
+                    )}
+                  </button>
+                ))}
+              </div>
+
+              <div className="flex gap-3">
+                <button onClick={() => setStep(2)} className="flex-1 rounded-xl border border-white/[0.06] bg-white/[0.03] px-4 py-3 text-sm font-medium text-slate-300 hover:bg-white/[0.06] transition-all">Back</button>
+                <button onClick={() => { setError(''); setStep(4); }}
+                  className="flex-1 rounded-xl bg-gradient-to-r from-indigo-500 to-violet-600 px-4 py-3 text-sm font-semibold text-white shadow-lg shadow-indigo-500/20 hover:brightness-110 transition-all">
+                  Continue
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* Step 4: Email Digest + Summary */}
+          {step === 4 && (
+            <div>
               <h1 className="text-2xl font-bold text-white mb-2">Stay updated with email digests</h1>
-              <p className="text-sm text-slate-400 mb-6">Get a daily summary of new job matches delivered to your inbox.</p>
+              <p className="text-sm text-slate-400 mb-6">Get a daily summary of new job matches.</p>
 
               <div className="rounded-2xl border border-white/[0.06] bg-white/[0.02] p-5 mb-4">
                 <label htmlFor="digest-email" className="mb-2 block text-sm font-medium text-slate-300">Email for digest</label>
@@ -219,11 +269,13 @@ export default function OnboardingPage() {
                 <p className="text-xs font-semibold text-indigo-400 uppercase tracking-wider mb-2">Your Setup Summary</p>
                 <p className="text-sm text-slate-300"><span className="text-slate-500">Keywords:</span> {selectedKeywords.join(', ')}</p>
                 <p className="text-sm text-slate-300"><span className="text-slate-500">Locations:</span> {selectedLocations.join(', ') || customLocation}</p>
+                <p className="text-sm text-slate-300"><span className="text-slate-500">Experience:</span> {EXPERIENCE_OPTIONS.find(o => o.value === experienceLevel)?.label}</p>
+                <p className="text-sm text-slate-300"><span className="text-slate-500">Sources:</span> LinkedIn, Unstop</p>
                 <p className="text-sm text-slate-300"><span className="text-slate-500">Email Digest:</span> {emailDigest ? 'On' : 'Off'}</p>
               </div>
 
               <div className="flex gap-3">
-                <button onClick={() => setStep(2)} className="flex-1 rounded-xl border border-white/[0.06] bg-white/[0.03] px-4 py-3 text-sm font-medium text-slate-300 hover:bg-white/[0.06] transition-all">Back</button>
+                <button onClick={() => setStep(3)} className="flex-1 rounded-xl border border-white/[0.06] bg-white/[0.03] px-4 py-3 text-sm font-medium text-slate-300 hover:bg-white/[0.06] transition-all">Back</button>
                 <button onClick={handleFinish} disabled={saving}
                   className="flex-1 rounded-xl bg-gradient-to-r from-indigo-500 to-violet-600 px-4 py-3 text-sm font-semibold text-white shadow-lg shadow-indigo-500/20 hover:brightness-110 disabled:opacity-40 disabled:cursor-not-allowed transition-all">
                   {saving ? 'Setting up...' : 'Start Finding Jobs'}

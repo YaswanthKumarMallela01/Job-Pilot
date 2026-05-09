@@ -1,10 +1,4 @@
-import { XMLParser } from 'fast-xml-parser';
-import type { RawJob } from './types';
-
-const parser = new XMLParser({
-  ignoreAttributes: false,
-  attributeNamePrefix: '@_',
-});
+import type { RawJob, ExperienceLevel } from './types';
 
 const MAX_JOBS = 50;
 
@@ -13,10 +7,7 @@ function locationMatches(jobLocation: string, userLocation: string): boolean {
   if (!userLocation || !jobLocation) return true;
   const loc = jobLocation.toLowerCase();
   const pref = userLocation.toLowerCase();
-  // Split user preferences by comma (e.g. "Remote, India, Bangalore")
   const prefParts = pref.split(',').map(p => p.trim()).filter(Boolean);
-  // If user wants "remote", accept remote jobs
-  // If user wants "india", accept any Indian city
   const indianCities = ['india', 'bangalore', 'bengaluru', 'mumbai', 'delhi', 'hyderabad',
     'pune', 'chennai', 'kolkata', 'gurgaon', 'gurugram', 'noida', 'ahmedabad', 'jaipur',
     'chandigarh', 'indore', 'kochi', 'thiruvananthapuram', 'coimbatore', 'lucknow', 'nagpur'];
@@ -27,17 +18,41 @@ function locationMatches(jobLocation: string, userLocation: string): boolean {
     if (p === 'india' || p === 'in') {
       if (indianCities.some(city => loc.includes(city))) return true;
     }
-    // If user specified a specific city, check if it's in the job location
     if (indianCities.includes(p) && loc.includes(p)) return true;
   }
   return false;
 }
 
+// ─── Map experience level to LinkedIn filter param ──────────
+function getLinkedInExpFilter(level: ExperienceLevel): string {
+  // LinkedIn f_E values: 1=Internship, 2=Entry, 3=Associate, 4=Mid-Senior, 5=Director, 6=Executive
+  switch (level) {
+    case 'internship': return '&f_E=1';
+    case 'entry': return '&f_E=1,2';
+    case 'mid': return '&f_E=3,4';
+    case 'senior': return '&f_E=4,5,6';
+    default: return ''; // 'any' = no filter
+  }
+}
+
+// ─── Map experience level to Unstop filter ──────────────────
+function getUnstopExpFilter(level: ExperienceLevel): string {
+  switch (level) {
+    case 'internship': return '&oppstatus=open&type=internships';
+    case 'entry': return '&oppstatus=open';
+    case 'mid': return '&oppstatus=open';
+    case 'senior': return '&oppstatus=open';
+    default: return '&oppstatus=open';
+  }
+}
+
 // ─── Fetch from LinkedIn Public Jobs API ─────────────────────
-export async function fetchLinkedInJobs(keyword: string, location: string): Promise<RawJob[]> {
+export async function fetchLinkedInJobs(keyword: string, location: string, experience: ExperienceLevel = 'any', page: number = 0): Promise<RawJob[]> {
   try {
     const locParam = location.toLowerCase().includes('india') ? 'India' : location;
-    const url = `https://www.linkedin.com/jobs-guest/jobs/api/seeMoreJobPostings/search?keywords=${encodeURIComponent(keyword)}&location=${encodeURIComponent(locParam)}&start=0`;
+    const expFilter = getLinkedInExpFilter(experience);
+    const start = page * 25; // LinkedIn paginates by 25
+    const url = `https://www.linkedin.com/jobs-guest/jobs/api/seeMoreJobPostings/search?keywords=${encodeURIComponent(keyword)}&location=${encodeURIComponent(locParam)}&start=${start}${expFilter}`;
     const res = await fetch(url, {
       headers: {
         'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
@@ -48,29 +63,18 @@ export async function fetchLinkedInJobs(keyword: string, location: string): Prom
     if (!res.ok) { console.warn(`LinkedIn returned ${res.status}`); return []; }
     const html = await res.text();
 
-    // Parse job cards from HTML using regex
     const jobs: RawJob[] = [];
-    // Match job URL + title: [Title](URL) pattern from the converted markdown/HTML
-    // LinkedIn HTML has: <a class="base-card__full-link" href="URL"><span>Title</span></a>
-    // And company: <h4 class="base-search-card__subtitle"><a>Company</a></h4>
-    // And location: <span class="job-search-card__location">Location</span>
 
-    // Extract job cards — each <li> contains one job
-    const cardRegex = /<div[^>]*class="[^"]*base-card[^"]*"[^>]*>[\s\S]*?<\/div>\s*<\/li>/gi;
-    const titleUrlRegex = /href="(https?:\/\/[^"]*linkedin\.com\/jobs\/view\/[^"]+)"[\s\S]*?<span[^>]*class="sr-only"[^>]*>([^<]+)<\/span>/i;
-    const companyRegex = /class="[^"]*base-search-card__subtitle[^"]*"[\s\S]*?>([^<]+)</i;
-    const locationRegex = /class="[^"]*job-search-card__location[^"]*"[^>]*>([^<]+)</i;
-
-    // Simpler approach: find all job links with titles
+    // Extract job links
     const linkRegex = /href="(https?:\/\/[^"]*linkedin\.com\/jobs\/view\/[^"]+)"[^>]*>/gi;
     const links: string[] = [];
     let linkMatch;
     while ((linkMatch = linkRegex.exec(html)) !== null) {
-      const href = linkMatch[1].split('?')[0]; // Clean URL
+      const href = linkMatch[1].split('?')[0];
       if (!links.includes(href)) links.push(href);
     }
 
-    // Extract titles from ### headings or <span class="sr-only"> tags
+    // Extract titles
     const titleRegex = /<span[^>]*class="sr-only"[^>]*>([^<]+)<\/span>/gi;
     const titles: string[] = [];
     let titleMatch;
@@ -78,7 +82,7 @@ export async function fetchLinkedInJobs(keyword: string, location: string): Prom
       titles.push(titleMatch[1].trim());
     }
 
-    // Extract companies from base-search-card__subtitle
+    // Extract companies
     const companyMatches = html.match(/class="[^"]*base-search-card__subtitle[^"]*"[\s\S]*?<a[^>]*>([^<]+)<\/a>/gi) || [];
     const companies: string[] = companyMatches.map(m => {
       const match = m.match(/>([^<]+)<\/a>/);
@@ -92,8 +96,7 @@ export async function fetchLinkedInJobs(keyword: string, location: string): Prom
       return match ? match[1].trim() : locParam;
     });
 
-    // Build job objects
-    const count = Math.min(links.length, titles.length, 15);
+    const count = Math.min(links.length, titles.length, 25);
     for (let i = 0; i < count; i++) {
       jobs.push({
         title: titles[i] || 'Unknown Title',
@@ -109,173 +112,12 @@ export async function fetchLinkedInJobs(keyword: string, location: string): Prom
   } catch (err) { console.error('LinkedIn fetch error:', err); return []; }
 }
 
-// ─── Fetch from Indeed RSS ───────────────────────────────────
-export async function fetchIndeedJobs(keyword: string, location: string): Promise<RawJob[]> {
+// ─── Fetch from Unstop (India-focused) ───────────────────────
+export async function fetchUnstopJobs(keyword: string, experience: ExperienceLevel = 'any', page: number = 0): Promise<RawJob[]> {
   try {
-    const url = `https://www.indeed.com/rss?q=${encodeURIComponent(keyword)}&l=${encodeURIComponent(location)}`;
-    const res = await fetch(url, {
-      headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36' },
-      signal: AbortSignal.timeout(10000),
-    });
-    if (!res.ok) { console.warn(`Indeed RSS returned ${res.status}`); return []; }
-    const xml = await res.text();
-    const parsed = parser.parse(xml);
-    const items = parsed?.rss?.channel?.item || [];
-    const jobItems = Array.isArray(items) ? items : [items];
-    return jobItems
-      .filter((item: Record<string, unknown>) => item.title && item.link)
-      .map((item: Record<string, unknown>) => ({
-        title: String(item.title || '').trim(),
-        company: String(item.source || item['dc:creator'] || 'Unknown').trim(),
-        location: location,
-        source: 'indeed' as const,
-        job_url: String(item.link || '').trim(),
-        description: String(item.description || '').trim().substring(0, 500),
-      }));
-  } catch (err) { console.error('Indeed RSS fetch error:', err); return []; }
-}
-
-// ─── Fetch from RemoteOK API ────────────────────────────────
-export async function fetchRemoteOKJobs(keyword: string): Promise<RawJob[]> {
-  try {
-    const url = `https://remoteok.com/api?tag=${encodeURIComponent(keyword)}`;
-    const res = await fetch(url, {
-      headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36' },
-      signal: AbortSignal.timeout(10000),
-    });
-    if (!res.ok) { console.warn(`RemoteOK returned ${res.status}`); return []; }
-    const data = await res.json();
-    const jobs = Array.isArray(data) ? data.slice(1) : [];
-    return jobs
-      .filter((job: Record<string, unknown>) => job.position && job.url)
-      .map((job: Record<string, unknown>) => ({
-        title: String(job.position || '').trim(),
-        company: String(job.company || 'Unknown').trim(),
-        location: String(job.location || 'Remote').trim(),
-        source: 'remoteok' as const,
-        job_url: String(job.url || '').trim(),
-        description: String(job.description || '').replace(/<[^>]*>/g, '').trim().substring(0, 500),
-      }));
-  } catch (err) { console.error('RemoteOK fetch error:', err); return []; }
-}
-
-// ─── Fetch from Arbeitnow API — with India location filter ──
-export async function fetchArbeitnowJobs(keyword: string, location: string): Promise<RawJob[]> {
-  try {
-    // Only fetch if location matches (Arbeitnow is EU-focused, skip for pure India searches)
-    const isIndiaOnly = location.toLowerCase().split(',').every(l =>
-      ['india', 'remote', 'bangalore', 'mumbai', 'delhi', 'hyderabad', 'pune', 'chennai'].includes(l.trim().toLowerCase())
-    );
-    if (isIndiaOnly) return []; // Skip Arbeitnow for India-only searches
-
-    const url = `https://www.arbeitnow.com/api/job-board-api?search=${encodeURIComponent(keyword)}&location=${encodeURIComponent(location)}`;
-    const res = await fetch(url, {
-      headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36' },
-      signal: AbortSignal.timeout(10000),
-    });
-    if (!res.ok) return [];
-    const data = await res.json();
-    const jobs = Array.isArray(data?.data) ? data.data : [];
-    return jobs
-      .filter((job: Record<string, unknown>) => job.title && job.url)
-      .map((job: Record<string, unknown>) => ({
-        title: String(job.title || '').trim(),
-        company: String(job.company_name || 'Unknown').trim(),
-        location: String(job.location || location).trim(),
-        source: 'arbeitnow' as const,
-        job_url: String(job.url || '').trim(),
-        description: String(job.description || '').replace(/<[^>]*>/g, '').trim().substring(0, 500),
-      }));
-  } catch (err) { console.error('Arbeitnow fetch error:', err); return []; }
-}
-
-// ─── Fetch from Jobicy API (remote jobs) ─────────────────────
-export async function fetchJobicyJobs(keyword: string): Promise<RawJob[]> {
-  try {
-    const url = `https://jobicy.com/api/v2/remote-jobs?count=15&tag=${encodeURIComponent(keyword)}`;
-    const res = await fetch(url, {
-      headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36' },
-      signal: AbortSignal.timeout(10000),
-    });
-    if (!res.ok) return [];
-    const data = await res.json();
-    const jobs = Array.isArray(data?.jobs) ? data.jobs : [];
-    return jobs
-      .filter((job: Record<string, unknown>) => job.jobTitle && job.url)
-      .map((job: Record<string, unknown>) => ({
-        title: String(job.jobTitle || '').trim(),
-        company: String(job.companyName || 'Unknown').trim(),
-        location: String(job.jobGeo || 'Remote').trim(),
-        source: 'jobicy' as const,
-        job_url: String(job.url || '').trim(),
-        description: String(job.jobExcerpt || '').trim().substring(0, 500),
-      }));
-  } catch (err) { console.error('Jobicy fetch error:', err); return []; }
-}
-
-// ─── Fetch from Adzuna RSS ───────────────────────────────────
-export async function fetchAdzunaJobs(keyword: string, location: string): Promise<RawJob[]> {
-  try {
-    const loc = location.toLowerCase();
-    const country = loc.includes('india') ? 'in'
-      : loc.includes('uk') || loc.includes('united kingdom') ? 'gb'
-      : loc.includes('canad') ? 'ca'
-      : loc.includes('australia') ? 'au'
-      : loc.includes('germany') ? 'de'
-      : 'in'; // Default to India
-    const url = `https://www.adzuna.com/feed/rss?q=${encodeURIComponent(keyword)}&country=${country}`;
-    const res = await fetch(url, {
-      headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36' },
-      signal: AbortSignal.timeout(10000),
-    });
-    if (!res.ok) return [];
-    const xml = await res.text();
-    const parsed = parser.parse(xml);
-    const items = parsed?.rss?.channel?.item || [];
-    const jobItems = Array.isArray(items) ? items : [items];
-    return jobItems
-      .filter((item: Record<string, unknown>) => item.title && item.link)
-      .map((item: Record<string, unknown>) => ({
-        title: String(item.title || '').trim(),
-        company: String(item['dc:creator'] || item.source || 'Unknown').trim(),
-        location: location,
-        source: 'adzuna' as const,
-        job_url: String(item.link || '').trim(),
-        description: String(item.description || '').replace(/<[^>]*>/g, '').trim().substring(0, 500),
-      }));
-  } catch (err) { console.error('Adzuna fetch error:', err); return []; }
-}
-
-// ─── Fetch from The Muse API ─────────────────────────────────
-export async function fetchTheMuseJobs(keyword: string, location: string): Promise<RawJob[]> {
-  try {
-    const url = `https://www.themuse.com/api/public/jobs?category=${encodeURIComponent(keyword)}&location=${encodeURIComponent(location)}&page=0`;
-    const res = await fetch(url, {
-      headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36' },
-      signal: AbortSignal.timeout(10000),
-    });
-    if (!res.ok) return [];
-    const data = await res.json();
-    const jobs = Array.isArray(data?.results) ? data.results : [];
-    return jobs
-      .filter((job: Record<string, unknown>) => job.name && job.refs)
-      .map((job: Record<string, unknown>) => ({
-        title: String(job.name || '').trim(),
-        company: String((job.company as Record<string, unknown>)?.name || 'Unknown').trim(),
-        location: Array.isArray(job.locations)
-          ? (job.locations as Array<Record<string, unknown>>).map(l => String(l.name || '')).join(', ')
-          : location,
-        source: 'themuse' as const,
-        job_url: String((job.refs as Record<string, unknown>)?.landing_page || '').trim(),
-        description: String(job.contents || '').replace(/<[^>]*>/g, '').trim().substring(0, 500),
-      }));
-  } catch (err) { console.error('The Muse fetch error:', err); return []; }
-}
-
-// ─── Fetch from Unstop (India-focused, competitions & jobs) ──
-export async function fetchUnstopJobs(keyword: string): Promise<RawJob[]> {
-  try {
-    const url = `https://unstop.com/api/public/opportunity/search-result?opportunity=jobs&per_page=15&oppstatus=open&search=${encodeURIComponent(keyword)}`;
+    const expFilter = getUnstopExpFilter(experience);
+    const opportunity = experience === 'internship' ? 'internships' : 'jobs';
+    const url = `https://unstop.com/api/public/opportunity/search-result?opportunity=${opportunity}&per_page=25&page=${page + 1}${expFilter}&search=${encodeURIComponent(keyword)}`;
     const res = await fetch(url, {
       headers: {
         'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
@@ -288,28 +130,23 @@ export async function fetchUnstopJobs(keyword: string): Promise<RawJob[]> {
     const opportunities = data?.data?.data || [];
     if (!Array.isArray(opportunities)) return [];
 
-    // Keyword parts for relevance filtering (e.g. "Software Engineer" -> ["software", "engineer"])
     const keywordParts = keyword.toLowerCase().split(/\s+/);
 
     return opportunities
       .filter((opp: Record<string, unknown>) => {
         if (!opp.title) return false;
-        // Only include jobs whose title contains at least one keyword word
         const title = String(opp.title).toLowerCase();
         return keywordParts.some(part => title.includes(part));
       })
       .map((opp: Record<string, unknown>) => {
-        // Extract city from locations array
         const locations = Array.isArray(opp.locations) ? opp.locations : [];
         const cityName = locations.length > 0
           ? (locations as Array<Record<string, unknown>>).map(l => `${l.city || ''}, ${l.country || ''}`).join('; ').trim()
           : 'India';
 
-        // seo_url already contains the full URL like "https://unstop.com/jobs/..."
         const seoUrl = String(opp.seo_url || '');
         const shortUrl = String(opp.short_url || '');
         const publicUrl = String(opp.public_url || '');
-        // Use seo_url directly if it starts with http, otherwise build from public_url
         const jobUrl = seoUrl.startsWith('http') ? seoUrl
           : shortUrl.startsWith('http') ? shortUrl
           : publicUrl ? `https://unstop.com/${publicUrl}`
@@ -331,39 +168,27 @@ export async function fetchUnstopJobs(keyword: string): Promise<RawJob[]> {
   } catch (err) { console.error('Unstop fetch error:', err); return []; }
 }
 
-// ─── Fetch all jobs — balanced distribution, capped at 50, day-based rotation ─
-export async function fetchAllJobs(keywords: string[], location: string): Promise<RawJob[]> {
+// ─── Fetch all jobs — 25 LinkedIn + 25 Unstop, day-based rotation ─
+export async function fetchAllJobs(keywords: string[], location: string, experience: ExperienceLevel = 'any'): Promise<RawJob[]> {
   const locationStr = location || 'India, Remote';
 
-  // Day-based offset: rotate through pages so each day returns different results
+  // Day-based offset for rotation
   const dayOfYear = Math.floor((Date.now() - new Date(new Date().getFullYear(), 0, 0).getTime()) / 86400000);
-  const pageOffset = (dayOfYear % 5); // Cycle through 5 pages (0-4)
+  const pageOffset = (dayOfYear % 5);
 
   const linkedInJobs: RawJob[] = [];
   const unstopJobs: RawJob[] = [];
-  const otherJobs: RawJob[] = [];
 
   for (const keyword of keywords) {
-    const results = await Promise.all([
-      fetchLinkedInJobs(keyword, locationStr),
-      fetchUnstopJobs(keyword),
-      // Other sources
-      fetchIndeedJobs(keyword, locationStr),
-      fetchRemoteOKJobs(keyword),
-      fetchArbeitnowJobs(keyword, locationStr),
-      fetchJobicyJobs(keyword),
-      fetchAdzunaJobs(keyword, locationStr),
-      fetchTheMuseJobs(keyword, locationStr),
+    const [liJobs, unJobs] = await Promise.all([
+      fetchLinkedInJobs(keyword, locationStr, experience, pageOffset),
+      fetchUnstopJobs(keyword, experience, pageOffset),
     ]);
-
-    linkedInJobs.push(...results[0]);
-    unstopJobs.push(...results[1]);
-    for (let i = 2; i < results.length; i++) {
-      otherJobs.push(...results[i]);
-    }
+    linkedInJobs.push(...liJobs);
+    unstopJobs.push(...unJobs);
   }
 
-  // Deduplicate within each source group
+  // Deduplicate
   const dedup = (jobs: RawJob[]): RawJob[] => {
     const seen = new Set<string>();
     return jobs.filter(j => {
@@ -373,14 +198,8 @@ export async function fetchAllJobs(keywords: string[], location: string): Promis
     });
   };
 
-  const dedupedLinkedIn = dedup(linkedInJobs);
-  const dedupedUnstop = dedup(unstopJobs);
-  const dedupedOther = dedup(otherJobs);
-
-  // Apply day-based offset for rotation — skip (offset * 20) jobs from each source
-  const offsetLinkedIn = dedupedLinkedIn.slice(pageOffset * 5);
-  const offsetUnstop = dedupedUnstop.slice(pageOffset * 3);
-  const offsetOther = dedupedOther.slice(pageOffset * 2);
+  const dedupedLI = dedup(linkedInJobs);
+  const dedupedUN = dedup(unstopJobs);
 
   // Keyword relevance filter
   const allKeywordParts = keywords.flatMap(k => k.toLowerCase().split(/\s+/)).filter(p => p.length > 2);
@@ -393,41 +212,27 @@ export async function fetchAllJobs(keywords: string[], location: string): Promis
     });
   };
 
-  // Apply relevance filter
-  const relevantLinkedIn = filterRelevant(offsetLinkedIn);
-  const relevantUnstop = filterRelevant(offsetUnstop);
-  const relevantOther = filterRelevant(offsetOther);
+  const relevantLI = filterRelevant(dedupedLI);
+  const relevantUN = filterRelevant(dedupedUN);
 
-  // Balanced distribution: 20 LinkedIn, 20 Unstop, 10 Others
-  const LINKEDIN_QUOTA = 20;
-  const UNSTOP_QUOTA = 20;
-  const OTHER_QUOTA = MAX_JOBS - LINKEDIN_QUOTA - UNSTOP_QUOTA;
+  // 25 from each source
+  const selectedLI = relevantLI.slice(0, 25);
+  const selectedUN = relevantUN.slice(0, 25);
 
-  const selectedLinkedIn = relevantLinkedIn.slice(0, LINKEDIN_QUOTA);
-  const selectedUnstop = relevantUnstop.slice(0, UNSTOP_QUOTA);
-  const selectedOther = relevantOther.slice(0, OTHER_QUOTA);
-
-  // Combine and fill remaining slots
-  const combined = [...selectedLinkedIn, ...selectedUnstop, ...selectedOther];
-
-  // If any source has fewer results, fill from others
+  // Combine and fill remaining
+  const combined = [...selectedLI, ...selectedUN];
   const remaining = MAX_JOBS - combined.length;
   if (remaining > 0) {
     const usedUrls = new Set(combined.map(j => j.job_url));
-    const extras = [...relevantLinkedIn, ...relevantUnstop, ...relevantOther]
+    const extras = [...relevantLI, ...relevantUN]
       .filter(j => !usedUrls.has(j.job_url))
       .slice(0, remaining);
     combined.push(...extras);
   }
 
-  // Final deduplication across all sources
-  const finalSeen = new Set<string>();
-  const final = combined.filter(j => {
-    if (!j.job_url || finalSeen.has(j.job_url)) return false;
-    finalSeen.add(j.job_url);
-    return true;
-  });
+  // Location filter (soft — fallback if too few)
+  const locFiltered = combined.filter(j => locationMatches(j.location, locationStr));
+  const final = locFiltered.length >= 10 ? locFiltered : combined;
 
   return final.slice(0, MAX_JOBS);
 }
-

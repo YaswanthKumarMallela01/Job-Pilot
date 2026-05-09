@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { getSupabase } from '@/lib/supabase';
-import type { UserPreferences } from '@/lib/types';
+import type { UserPreferences, ExperienceLevel } from '@/lib/types';
 
 export default function SettingsPage() {
   const router = useRouter();
@@ -13,6 +13,7 @@ export default function SettingsPage() {
   const [error, setError] = useState('');
   const [keywords, setKeywords] = useState('');
   const [location, setLocation] = useState('');
+  const [experienceLevel, setExperienceLevel] = useState<ExperienceLevel>('any');
   const [email, setEmail] = useState('');
   const [emailDigestEnabled, setEmailDigestEnabled] = useState(true);
   const [prefsId, setPrefsId] = useState<string | null>(null);
@@ -28,6 +29,7 @@ export default function SettingsPage() {
         setPrefsId(p.id);
         setKeywords((p.keywords || []).join(', '));
         setLocation(p.location || '');
+        setExperienceLevel(p.experience_level || 'any');
         setEmail(p.email || user.email || '');
         setEmailDigestEnabled(p.email_digest_enabled);
       } else { setEmail(user.email || ''); }
@@ -44,7 +46,7 @@ export default function SettingsPage() {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) { router.push('/login'); return; }
       const kw = keywords.split(',').map(k => k.trim()).filter(k => k.length > 0);
-      const payload = { user_id: user.id, keywords: kw, location, email, email_digest_enabled: emailDigestEnabled, updated_at: new Date().toISOString() };
+      const payload = { user_id: user.id, keywords: kw, location, experience_level: experienceLevel, email, email_digest_enabled: emailDigestEnabled, updated_at: new Date().toISOString() };
       if (prefsId) {
         const { error: e } = await supabase.from('user_preferences').update(payload).eq('id', prefsId);
         if (e) throw e;
@@ -82,8 +84,28 @@ export default function SettingsPage() {
         </div>
         <div className="rounded-2xl border border-white/[0.06] bg-[#12121f]/40 p-5">
           <label htmlFor="location" className="mb-1 block text-sm font-semibold text-white">Location</label>
-          <p className="mb-3 text-xs text-slate-500">e.g. Remote, India, Bangalore</p>
-          <input id="location" type="text" value={location} onChange={e => setLocation(e.target.value)} placeholder="Remote" className="w-full rounded-xl border border-white/[0.06] bg-white/[0.03] px-4 py-3 text-sm text-white placeholder-slate-500 outline-none focus:border-indigo-500/40 focus:ring-2 focus:ring-indigo-500/20" />
+          <p className="mb-3 text-xs text-slate-500">Comma-separated (e.g. Remote, India, Bangalore)</p>
+          <input id="location" type="text" value={location} onChange={e => setLocation(e.target.value)} placeholder="Remote, India" className="w-full rounded-xl border border-white/[0.06] bg-white/[0.03] px-4 py-3 text-sm text-white placeholder-slate-500 outline-none focus:border-indigo-500/40 focus:ring-2 focus:ring-indigo-500/20" />
+        </div>
+        <div className="rounded-2xl border border-white/[0.06] bg-[#12121f]/40 p-5">
+          <label className="mb-1 block text-sm font-semibold text-white">Experience Level</label>
+          <p className="mb-3 text-xs text-slate-500">Filter jobs by your experience level</p>
+          <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+            {([
+              { value: 'internship', label: '🎓 Internship' },
+              { value: 'entry', label: '🌱 Entry' },
+              { value: 'mid', label: '💼 Mid Level' },
+              { value: 'senior', label: '🚀 Senior' },
+              { value: 'any', label: '🌐 Any Level' },
+            ] as { value: ExperienceLevel; label: string }[]).map(opt => (
+              <button key={opt.value} type="button" onClick={() => setExperienceLevel(opt.value)}
+                className={`rounded-xl px-3 py-2.5 text-sm font-medium transition-all ${
+                  experienceLevel === opt.value
+                    ? 'bg-indigo-500/20 text-indigo-300 border border-indigo-500/30'
+                    : 'bg-white/[0.03] text-slate-400 border border-white/[0.06] hover:bg-white/[0.06]'
+                }`}>{opt.label}</button>
+            ))}
+          </div>
         </div>
         <div className="rounded-2xl border border-white/[0.06] bg-[#12121f]/40 p-5">
           <label htmlFor="digest-email" className="mb-1 block text-sm font-semibold text-white">Digest Email</label>
@@ -104,23 +126,20 @@ export default function SettingsPage() {
       {/* Danger Zone: Delete Account */}
       <div className="mt-12 rounded-2xl border border-red-500/20 bg-red-500/5 p-5">
         <h2 className="text-lg font-bold text-red-400 mb-1">Danger Zone</h2>
-        <p className="text-xs text-slate-400 mb-4">Once you delete your account, all your data (jobs, preferences, email logs) will be permanently removed. This cannot be undone.</p>
+        <p className="text-xs text-slate-400 mb-4">Once you delete your account, all your data will be permanently removed. This cannot be undone.</p>
         <button
           onClick={async () => {
-            if (!confirm('Are you sure you want to delete your account? This action is PERMANENT and cannot be undone.')) return;
-            if (!confirm('This will delete ALL your saved jobs, preferences, and email logs. Type OK to proceed.')) return;
-
+            if (!confirm('Are you sure you want to delete your account? This action is PERMANENT.')) return;
+            if (!confirm('This will delete ALL your saved jobs, preferences, and email logs.')) return;
             try {
               const supabase = getSupabase();
               const { data: { user } } = await supabase.auth.getUser();
               if (!user) return;
-
               const res = await fetch('/api/delete-account', {
                 method: 'DELETE',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ user_id: user.id }),
               });
-
               if (res.ok) {
                 await supabase.auth.signOut();
                 router.push('/');
@@ -128,9 +147,7 @@ export default function SettingsPage() {
                 const data = await res.json();
                 alert(data.error || 'Failed to delete account.');
               }
-            } catch {
-              alert('An error occurred while deleting your account.');
-            }
+            } catch { alert('An error occurred while deleting your account.'); }
           }}
           className="rounded-xl border border-red-500/30 bg-red-500/10 px-5 py-2.5 text-sm font-semibold text-red-400 hover:bg-red-500/20 hover:text-red-300 transition-all"
         >

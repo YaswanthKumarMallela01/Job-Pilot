@@ -8,8 +8,8 @@ const FEATURES = [
         <line x1="21" y1="21" x2="16.65" y2="16.65" />
       </svg>
     ),
-    title: 'Auto-Search 8 Sources',
-    description: 'Fetches jobs from LinkedIn, Indeed, RemoteOK, Unstop, Jobicy, Adzuna, The Muse, and Arbeitnow — so you never miss a listing.',
+    title: 'LinkedIn + Unstop Search',
+    description: 'Fetches jobs from LinkedIn and Unstop with experience-level filtering — the two best sources for jobs in India.',
   },
   {
     icon: (

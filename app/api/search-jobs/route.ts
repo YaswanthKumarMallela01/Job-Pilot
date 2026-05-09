@@ -33,8 +33,8 @@ export async function POST(req: NextRequest) {
       }, { status: 400 });
     }
 
-    // Fetch jobs from all sources using user's preferences
-    const rawJobs = await fetchAllJobs(userPrefs.keywords, userPrefs.location || 'India, Remote');
+    // Fetch jobs from LinkedIn + Unstop using user's preferences
+    const rawJobs = await fetchAllJobs(userPrefs.keywords, userPrefs.location || 'India, Remote', userPrefs.experience_level || 'any');
 
     // Get existing job URLs for this user to deduplicate
     const { data: existingJobs } = await supabase
@@ -101,7 +101,7 @@ export async function POST(req: NextRequest) {
       total_found: rawJobs.length,
       new_jobs: insertedCount,
       duplicates_skipped: rawJobs.length - insertedCount,
-      sources_checked: 8,
+      sources_checked: 2,
       email_sent: emailSent,
     });
   } catch (err) {

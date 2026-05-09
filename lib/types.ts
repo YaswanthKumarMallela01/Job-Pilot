@@ -2,7 +2,10 @@
 export type JobStatus = 'new' | 'saved' | 'applied' | 'interview' | 'rejected';
 
 // ─── Job Source ──────────────────────────────────────────────
-export type JobSource = 'linkedin' | 'indeed' | 'remoteok' | 'arbeitnow' | 'jobicy' | 'adzuna' | 'themuse' | 'unstop';
+export type JobSource = 'linkedin' | 'unstop';
+
+// ─── Experience Level ────────────────────────────────────────
+export type ExperienceLevel = 'internship' | 'entry' | 'mid' | 'senior' | 'any';
 
 // ─── Job ─────────────────────────────────────────────────────
 export interface Job {
@@ -27,6 +30,7 @@ export interface UserPreferences {
   user_id: string;
   keywords: string[];
   location: string;
+  experience_level: ExperienceLevel;
   email: string;
   email_digest_enabled: boolean;
   created_at: string;

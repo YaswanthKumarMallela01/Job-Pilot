@@ -29,7 +29,6 @@ export default function FilterBar({
     <div className="flex flex-col gap-4 rounded-2xl border border-white/[0.06] bg-[#12121f]/40 p-4 sm:p-5">
       {/* Top row: search + count */}
       <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
-        {/* Search */}
         <div className="relative flex-1">
           <svg
             className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-500"
@@ -40,7 +39,7 @@ export default function FilterBar({
           </svg>
           <input
             type="text"
-            placeholder="Search by title or company..."
+            placeholder="Search by title, company, or location..."
             value={search}
             onChange={(e) => onSearchChange(e.target.value)}
             className="w-full rounded-xl border border-white/[0.06] bg-white/[0.03] py-2.5 pl-10 pr-4 text-sm text-white placeholder-slate-500 outline-none transition-all focus:border-indigo-500/40 focus:ring-2 focus:ring-indigo-500/20"
@@ -76,12 +75,6 @@ export default function FilterBar({
         >
           <option value="all" className="bg-[#16162a]">All Sources</option>
           <option value="linkedin" className="bg-[#16162a]">LinkedIn</option>
-          <option value="indeed" className="bg-[#16162a]">Indeed</option>
-          <option value="remoteok" className="bg-[#16162a]">RemoteOK</option>
-          <option value="arbeitnow" className="bg-[#16162a]">Arbeitnow</option>
-          <option value="jobicy" className="bg-[#16162a]">Jobicy</option>
-          <option value="adzuna" className="bg-[#16162a]">Adzuna</option>
-          <option value="themuse" className="bg-[#16162a]">The Muse</option>
           <option value="unstop" className="bg-[#16162a]">Unstop</option>
         </select>
 
