@@ -1,7 +1,7 @@
 {
   "crons": [
     {
-      "path": "/api/fetch-jobs",
+      "path": "/api/fetch-jobs?secret=make_up_any_long_random_string_here",
       "schedule": "30 3 * * *"
     }
   ]

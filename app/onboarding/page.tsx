@@ -22,7 +22,7 @@ export default function OnboardingPage() {
   const [step, setStep] = useState(1);
   const [selectedKeywords, setSelectedKeywords] = useState<string[]>([]);
   const [customKeyword, setCustomKeyword] = useState('');
-  const [selectedLocation, setSelectedLocation] = useState('');
+  const [selectedLocations, setSelectedLocations] = useState<string[]>([]);
   const [customLocation, setCustomLocation] = useState('');
   const [email, setEmail] = useState('');
   const [emailDigest, setEmailDigest] = useState(true);
@@ -53,10 +53,24 @@ export default function OnboardingPage() {
     }
   };
 
+  const toggleLocation = (loc: string) => {
+    setSelectedLocations(prev =>
+      prev.includes(loc) ? prev.filter(l => l !== loc) : [...prev, loc]
+    );
+  };
+
+  const addCustomLocation = () => {
+    const loc = customLocation.trim();
+    if (loc && !selectedLocations.includes(loc)) {
+      setSelectedLocations(prev => [...prev, loc]);
+      setCustomLocation('');
+    }
+  };
+
   const handleFinish = async () => {
-    const location = selectedLocation || customLocation;
+    const locationStr = selectedLocations.join(', ') || customLocation;
     if (selectedKeywords.length === 0) { setError('Please select at least one job keyword.'); return; }
-    if (!location) { setError('Please select or enter a location.'); return; }
+    if (!locationStr) { setError('Please select at least one location.'); return; }
 
     setSaving(true);
     setError('');
@@ -68,7 +82,7 @@ export default function OnboardingPage() {
       const { error: insertError } = await supabase.from('user_preferences').insert({
         user_id: user.id,
         keywords: selectedKeywords,
-        location,
+        location: locationStr,
         email: email || user.email,
         email_digest_enabled: emailDigest,
       });
@@ -139,29 +153,37 @@ export default function OnboardingPage() {
             </div>
           )}
 
-          {/* Step 2: Location */}
+          {/* Step 2: Location — Multi-select */}
           {step === 2 && (
             <div>
               <h1 className="text-2xl font-bold text-white mb-2">Where do you want to work?</h1>
-              <p className="text-sm text-slate-400 mb-6">Pick a location or type your preferred one.</p>
+              <p className="text-sm text-slate-400 mb-6">Select one or more locations. You can pick multiple!</p>
 
               <div className="flex flex-wrap gap-2 mb-4">
                 {POPULAR_LOCATIONS.map(loc => (
-                  <button key={loc} onClick={() => { setSelectedLocation(loc); setCustomLocation(''); }}
+                  <button key={loc} onClick={() => toggleLocation(loc)}
                     className={`rounded-full px-4 py-2 text-sm font-medium transition-all ${
-                      selectedLocation === loc
+                      selectedLocations.includes(loc)
                         ? 'bg-indigo-500 text-white shadow-lg shadow-indigo-500/20'
                         : 'bg-white/[0.04] text-slate-400 hover:bg-white/[0.08] hover:text-white border border-white/[0.06]'
                     }`}>{loc}</button>
                 ))}
               </div>
 
-              <input value={customLocation} onChange={e => { setCustomLocation(e.target.value); setSelectedLocation(''); }}
-                placeholder="Or type a custom location..." className="w-full rounded-xl border border-white/[0.06] bg-white/[0.03] px-4 py-2.5 text-sm text-white placeholder-slate-500 outline-none focus:border-indigo-500/40 focus:ring-2 focus:ring-indigo-500/20 mb-6" />
+              <div className="flex gap-2 mb-4">
+                <input value={customLocation} onChange={e => setCustomLocation(e.target.value)}
+                  onKeyDown={e => e.key === 'Enter' && addCustomLocation()}
+                  placeholder="Add custom location..." className="flex-1 rounded-xl border border-white/[0.06] bg-white/[0.03] px-4 py-2.5 text-sm text-white placeholder-slate-500 outline-none focus:border-indigo-500/40 focus:ring-2 focus:ring-indigo-500/20" />
+                <button onClick={addCustomLocation} className="rounded-xl bg-white/[0.06] px-4 py-2.5 text-sm font-medium text-slate-300 hover:bg-white/[0.1] transition-all">Add</button>
+              </div>
+
+              {selectedLocations.length > 0 && (
+                <p className="text-xs text-slate-500 mb-4">Selected: <span className="text-indigo-400">{selectedLocations.join(', ')}</span></p>
+              )}
 
               <div className="flex gap-3">
                 <button onClick={() => setStep(1)} className="flex-1 rounded-xl border border-white/[0.06] bg-white/[0.03] px-4 py-3 text-sm font-medium text-slate-300 hover:bg-white/[0.06] transition-all">Back</button>
-                <button onClick={() => { setError(''); setStep(3); }} disabled={!selectedLocation && !customLocation}
+                <button onClick={() => { setError(''); setStep(3); }} disabled={selectedLocations.length === 0 && !customLocation}
                   className="flex-1 rounded-xl bg-gradient-to-r from-indigo-500 to-violet-600 px-4 py-3 text-sm font-semibold text-white shadow-lg shadow-indigo-500/20 hover:brightness-110 disabled:opacity-40 disabled:cursor-not-allowed transition-all">
                   Continue
                 </button>
@@ -196,7 +218,7 @@ export default function OnboardingPage() {
               <div className="rounded-2xl border border-indigo-500/20 bg-indigo-500/5 p-4 mb-6">
                 <p className="text-xs font-semibold text-indigo-400 uppercase tracking-wider mb-2">Your Setup Summary</p>
                 <p className="text-sm text-slate-300"><span className="text-slate-500">Keywords:</span> {selectedKeywords.join(', ')}</p>
-                <p className="text-sm text-slate-300"><span className="text-slate-500">Location:</span> {selectedLocation || customLocation}</p>
+                <p className="text-sm text-slate-300"><span className="text-slate-500">Locations:</span> {selectedLocations.join(', ') || customLocation}</p>
                 <p className="text-sm text-slate-300"><span className="text-slate-500">Email Digest:</span> {emailDigest ? 'On' : 'Off'}</p>
               </div>
 

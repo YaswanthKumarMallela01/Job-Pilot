@@ -2,7 +2,6 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
-import { getSupabase } from '@/lib/supabase';
 
 export default function SignupPage() {
   const [email, setEmail] = useState('');
@@ -21,15 +20,16 @@ export default function SignupPage() {
 
     setLoading(true);
     try {
-      const supabase = getSupabase();
-      const { error: authError } = await supabase.auth.signUp({ email, password });
-      if (authError) {
-        // Handle Supabase email rate limit
-        if (authError.message.toLowerCase().includes('rate limit') || authError.message.toLowerCase().includes('email rate')) {
-          setError('Email rate limit reached. Please wait a few minutes and try again, or ask the admin to increase the rate limit in Supabase Dashboard → Authentication → Rate Limits.');
-        } else {
-          setError(authError.message);
-        }
+      // Use our custom signup API that sends email via Gmail SMTP
+      const res = await fetch('/api/signup', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, password }),
+      });
+      const data = await res.json();
+
+      if (!res.ok) {
+        setError(data.error || 'Failed to create account.');
         return;
       }
       setEmailSent(true);
@@ -55,14 +55,14 @@ export default function SignupPage() {
                 <polyline points="22,6 12,13 2,6" />
               </svg>
             </div>
-            <h1 className="text-2xl font-bold text-white mb-2">Check your email</h1>
+            <h1 className="text-2xl font-bold text-white mb-2">Account created! 🎉</h1>
             <p className="text-sm text-slate-400 mb-4 leading-relaxed">
-              We&apos;ve sent a verification link to<br />
+              Your account is ready. A welcome email has been sent to<br />
               <span className="text-indigo-400 font-medium">{email}</span>
             </p>
-            <div className="rounded-xl border border-amber-500/20 bg-amber-500/5 px-4 py-3 text-sm text-amber-300 mb-6">
-              <p className="font-medium mb-1">Please verify your email to continue</p>
-              <p className="text-xs text-amber-400/70">Check your spam folder if you don&apos;t see it within a few minutes.</p>
+            <div className="rounded-xl border border-emerald-500/20 bg-emerald-500/5 px-4 py-3 text-sm text-emerald-300 mb-6">
+              <p className="font-medium mb-1">You can log in now!</p>
+              <p className="text-xs text-emerald-400/70">Your email has been verified automatically.</p>
             </div>
             <Link href="/login" className="inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-indigo-500 to-violet-600 px-6 py-3 text-sm font-semibold text-white shadow-lg shadow-indigo-500/20 hover:brightness-110 transition-all">
               Go to Login

@@ -33,32 +33,80 @@ function locationMatches(jobLocation: string, userLocation: string): boolean {
   return false;
 }
 
-// ─── Fetch from LinkedIn RSS ─────────────────────────────────
+// ─── Fetch from LinkedIn Public Jobs API ─────────────────────
 export async function fetchLinkedInJobs(keyword: string, location: string): Promise<RawJob[]> {
   try {
-    // Use India-specific LinkedIn URL when location includes India
     const locParam = location.toLowerCase().includes('india') ? 'India' : location;
-    const url = `https://www.linkedin.com/jobs/search/feed?keywords=${encodeURIComponent(keyword)}&location=${encodeURIComponent(locParam)}&f_TPR=r86400`;
+    const url = `https://www.linkedin.com/jobs-guest/jobs/api/seeMoreJobPostings/search?keywords=${encodeURIComponent(keyword)}&location=${encodeURIComponent(locParam)}&start=0`;
     const res = await fetch(url, {
-      headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36' },
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+        'Accept': 'text/html,application/xhtml+xml',
+      },
       signal: AbortSignal.timeout(10000),
     });
-    if (!res.ok) { console.warn(`LinkedIn RSS returned ${res.status}`); return []; }
-    const xml = await res.text();
-    const parsed = parser.parse(xml);
-    const items = parsed?.rss?.channel?.item || parsed?.feed?.entry || [];
-    const jobItems = Array.isArray(items) ? items : [items];
-    return jobItems
-      .filter((item: Record<string, unknown>) => item.title && item.link)
-      .map((item: Record<string, unknown>) => ({
-        title: String(item.title || '').trim(),
-        company: String(item['dc:creator'] || item.author || 'Unknown').trim(),
-        location: String(item['dc:location'] || locParam).trim(),
+    if (!res.ok) { console.warn(`LinkedIn returned ${res.status}`); return []; }
+    const html = await res.text();
+
+    // Parse job cards from HTML using regex
+    const jobs: RawJob[] = [];
+    // Match job URL + title: [Title](URL) pattern from the converted markdown/HTML
+    // LinkedIn HTML has: <a class="base-card__full-link" href="URL"><span>Title</span></a>
+    // And company: <h4 class="base-search-card__subtitle"><a>Company</a></h4>
+    // And location: <span class="job-search-card__location">Location</span>
+
+    // Extract job cards — each <li> contains one job
+    const cardRegex = /<div[^>]*class="[^"]*base-card[^"]*"[^>]*>[\s\S]*?<\/div>\s*<\/li>/gi;
+    const titleUrlRegex = /href="(https?:\/\/[^"]*linkedin\.com\/jobs\/view\/[^"]+)"[\s\S]*?<span[^>]*class="sr-only"[^>]*>([^<]+)<\/span>/i;
+    const companyRegex = /class="[^"]*base-search-card__subtitle[^"]*"[\s\S]*?>([^<]+)</i;
+    const locationRegex = /class="[^"]*job-search-card__location[^"]*"[^>]*>([^<]+)</i;
+
+    // Simpler approach: find all job links with titles
+    const linkRegex = /href="(https?:\/\/[^"]*linkedin\.com\/jobs\/view\/[^"]+)"[^>]*>/gi;
+    const links: string[] = [];
+    let linkMatch;
+    while ((linkMatch = linkRegex.exec(html)) !== null) {
+      const href = linkMatch[1].split('?')[0]; // Clean URL
+      if (!links.includes(href)) links.push(href);
+    }
+
+    // Extract titles from ### headings or <span class="sr-only"> tags
+    const titleRegex = /<span[^>]*class="sr-only"[^>]*>([^<]+)<\/span>/gi;
+    const titles: string[] = [];
+    let titleMatch;
+    while ((titleMatch = titleRegex.exec(html)) !== null) {
+      titles.push(titleMatch[1].trim());
+    }
+
+    // Extract companies from base-search-card__subtitle
+    const companyMatches = html.match(/class="[^"]*base-search-card__subtitle[^"]*"[\s\S]*?<a[^>]*>([^<]+)<\/a>/gi) || [];
+    const companies: string[] = companyMatches.map(m => {
+      const match = m.match(/>([^<]+)<\/a>/);
+      return match ? match[1].trim() : 'Unknown';
+    });
+
+    // Extract locations
+    const locMatches = html.match(/class="[^"]*job-search-card__location[^"]*"[^>]*>[^<]+/gi) || [];
+    const locations: string[] = locMatches.map(m => {
+      const match = m.match(/>([^<]+)$/);
+      return match ? match[1].trim() : locParam;
+    });
+
+    // Build job objects
+    const count = Math.min(links.length, titles.length, 15);
+    for (let i = 0; i < count; i++) {
+      jobs.push({
+        title: titles[i] || 'Unknown Title',
+        company: companies[i] || 'Unknown',
+        location: locations[i] || locParam,
         source: 'linkedin' as const,
-        job_url: String(item.link || '').trim(),
-        description: String(item.description || item.summary || '').trim().substring(0, 500),
-      }));
-  } catch (err) { console.error('LinkedIn RSS fetch error:', err); return []; }
+        job_url: links[i],
+        description: `${titles[i] || ''} at ${companies[i] || 'Unknown'} — ${locations[i] || locParam}`,
+      });
+    }
+
+    return jobs;
+  } catch (err) { console.error('LinkedIn fetch error:', err); return []; }
 }
 
 // ─── Fetch from Indeed RSS ───────────────────────────────────
