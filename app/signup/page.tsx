@@ -23,7 +23,15 @@ export default function SignupPage() {
     try {
       const supabase = getSupabase();
       const { error: authError } = await supabase.auth.signUp({ email, password });
-      if (authError) { setError(authError.message); return; }
+      if (authError) {
+        // Handle Supabase email rate limit
+        if (authError.message.toLowerCase().includes('rate limit') || authError.message.toLowerCase().includes('email rate')) {
+          setError('Email rate limit reached. Please wait a few minutes and try again, or ask the admin to increase the rate limit in Supabase Dashboard → Authentication → Rate Limits.');
+        } else {
+          setError(authError.message);
+        }
+        return;
+      }
       setEmailSent(true);
     } catch {
       setError('An unexpected error occurred. Please try again.');

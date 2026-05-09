@@ -82,6 +82,7 @@ export default function FilterBar({
           <option value="jobicy" className="bg-[#16162a]">Jobicy</option>
           <option value="adzuna" className="bg-[#16162a]">Adzuna</option>
           <option value="themuse" className="bg-[#16162a]">The Muse</option>
+          <option value="unstop" className="bg-[#16162a]">Unstop</option>
         </select>
 
         {/* View mode toggle */}

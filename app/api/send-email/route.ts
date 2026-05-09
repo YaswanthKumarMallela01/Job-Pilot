@@ -30,7 +30,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ message: 'No new jobs to send' });
     }
 
-    const result = await sendDigestEmail(jobs as Job[], email);
+    const result = await sendDigestEmail(email, jobs as Job[]);
 
     // Log the email attempt
     await supabase.from('email_logs').insert({

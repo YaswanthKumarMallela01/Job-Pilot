@@ -33,7 +33,7 @@ export async function POST(req: NextRequest) {
 
       try {
         // Fetch jobs for this user's keywords
-        const rawJobs = await fetchAllJobs(prefs.keywords, prefs.location || 'Remote');
+        const rawJobs = await fetchAllJobs(prefs.keywords, prefs.location || 'India, Remote');
 
         // Get existing job URLs for this user
         const { data: existingJobs } = await supabase
@@ -75,8 +75,8 @@ export async function POST(req: NextRequest) {
             .limit(20);
 
           const result = await sendDigestEmail(
-            (insertedJobs as Job[]) || [],
-            prefs.email
+            prefs.email,
+            (insertedJobs as Job[]) || []
           );
 
           // Log email

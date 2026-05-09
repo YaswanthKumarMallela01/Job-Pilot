@@ -17,6 +17,7 @@ const SOURCE_BADGE: Record<JobSource, { label: string; classes: string }> = {
   jobicy: { label: 'Jobicy', classes: 'bg-cyan-500/10 text-cyan-400 border-cyan-500/20' },
   adzuna: { label: 'Adzuna', classes: 'bg-lime-500/10 text-lime-400 border-lime-500/20' },
   themuse: { label: 'The Muse', classes: 'bg-pink-500/10 text-pink-400 border-pink-500/20' },
+  unstop: { label: 'Unstop', classes: 'bg-rose-500/10 text-rose-400 border-rose-500/20' },
 };
 
 export default function JobCard({ job, onStatusChange, isUpdating }: JobCardProps) {

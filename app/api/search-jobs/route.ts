@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createServerClient } from '@/lib/supabase';
 import { fetchAllJobs } from '@/lib/fetchJobs';
-import type { UserPreferences } from '@/lib/types';
+import { sendDigestEmail } from '@/lib/sendEmail';
+import type { UserPreferences, RawJob } from '@/lib/types';
 
 export async function POST(req: NextRequest) {
   try {
@@ -32,8 +33,8 @@ export async function POST(req: NextRequest) {
       }, { status: 400 });
     }
 
-    // Fetch jobs from all sources
-    const rawJobs = await fetchAllJobs(userPrefs.keywords, userPrefs.location || 'Remote');
+    // Fetch jobs from all sources using user's preferences
+    const rawJobs = await fetchAllJobs(userPrefs.keywords, userPrefs.location || 'India, Remote');
 
     // Get existing job URLs for this user to deduplicate
     const { data: existingJobs } = await supabase
@@ -44,7 +45,7 @@ export async function POST(req: NextRequest) {
     const existingUrls = new Set((existingJobs || []).map((j: { job_url: string }) => j.job_url));
     const newJobs = rawJobs.filter((j) => !existingUrls.has(j.job_url));
 
-    // Insert new jobs
+    // Insert new jobs (capped at 50 by fetchAllJobs)
     let insertedCount = 0;
     if (newJobs.length > 0) {
       const insertData = newJobs.map((j) => ({
@@ -66,12 +67,42 @@ export async function POST(req: NextRequest) {
       }
     }
 
+    // Send email digest with all found jobs (new + existing recent)
+    let emailSent = false;
+    if (userPrefs.email_digest_enabled && userPrefs.email) {
+      try {
+        // Send email with all the jobs that were found (not just new)
+        const jobsForEmail: RawJob[] = rawJobs.slice(0, 50);
+        if (jobsForEmail.length > 0) {
+          await sendDigestEmail(userPrefs.email, jobsForEmail);
+          emailSent = true;
+
+          // Log the email
+          await supabase.from('email_logs').insert({
+            user_id,
+            status: 'success',
+            jobs_count: jobsForEmail.length,
+          });
+        }
+      } catch (emailErr) {
+        console.error('Email send error:', emailErr);
+        // Log the failure but don't fail the whole request
+        await supabase.from('email_logs').insert({
+          user_id,
+          status: 'failed',
+          jobs_count: 0,
+          error_message: String(emailErr),
+        });
+      }
+    }
+
     return NextResponse.json({
       success: true,
       total_found: rawJobs.length,
       new_jobs: insertedCount,
       duplicates_skipped: rawJobs.length - insertedCount,
-      sources_checked: 7,
+      sources_checked: 8,
+      email_sent: emailSent,
     });
   } catch (err) {
     console.error('Search jobs error:', err);

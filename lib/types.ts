@@ -2,7 +2,7 @@
 export type JobStatus = 'new' | 'saved' | 'applied' | 'interview' | 'rejected';
 
 // ─── Job Source ──────────────────────────────────────────────
-export type JobSource = 'linkedin' | 'indeed' | 'remoteok' | 'arbeitnow' | 'jobicy' | 'adzuna' | 'themuse';
+export type JobSource = 'linkedin' | 'indeed' | 'remoteok' | 'arbeitnow' | 'jobicy' | 'adzuna' | 'themuse' | 'unstop';
 
 // ─── Job ─────────────────────────────────────────────────────
 export interface Job {

@@ -59,7 +59,7 @@ export default function JobsPage() {
       if (res.ok) {
         setSearchResult({
           success: true,
-          message: `Found ${data.total_found} jobs across ${data.sources_checked} sources. ${data.new_jobs} new jobs added, ${data.duplicates_skipped} duplicates skipped.`,
+          message: `Found ${data.total_found} jobs across ${data.sources_checked} sources. ${data.new_jobs} new jobs added.${data.email_sent ? ' Email digest sent!' : ''}`,
         });
         // Refresh the job list
         await fetchJobs();
@@ -155,7 +155,7 @@ export default function JobsPage() {
             {searching ? (
               <>
                 <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24" fill="none"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/></svg>
-                Searching 7 sources...
+                Searching 8 sources...
               </>
             ) : (
               <>

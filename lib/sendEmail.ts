@@ -1,5 +1,14 @@
 import nodemailer from 'nodemailer';
-import type { Job } from './types';
+
+// Accept any object with these fields (works for both Job and RawJob)
+interface EmailJob {
+  title: string;
+  company?: string | null;
+  location?: string | null;
+  source: string;
+  job_url: string;
+  description?: string | null;
+}
 
 // ─── Create Gmail SMTP transporter ──────────────────────────
 function createTransporter() {
@@ -15,7 +24,7 @@ function createTransporter() {
 }
 
 // ─── Generate HTML email body ────────────────────────────────
-function generateHtmlBody(jobs: Job[], recipientEmail: string, date: string): string {
+function generateHtmlBody(jobs: EmailJob[], recipientEmail: string, date: string): string {
   const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
 
   const jobRows = jobs
@@ -50,14 +59,14 @@ function generateHtmlBody(jobs: Job[], recipientEmail: string, date: string): st
           <tr>
             <td style="padding: 24px 0; border-bottom: 1px solid #2d2d3d;">
               <h1 style="margin: 0; color: #e0e0f0; font-size: 22px; font-weight: 700;">JobPilot Daily Digest</h1>
-              <p style="margin: 8px 0 0; color: #8888a0; font-size: 14px;">${date}</p>
+              <p style="margin: 8px 0 0; color: #8888a0; font-size: 14px;">${date} — ${jobs.length} jobs found across 8 sources</p>
             </td>
           </tr>
         </table>
 
         <!-- Greeting -->
         <p style="color: #c0c0d0; font-size: 15px; line-height: 1.6; margin: 0 0 20px;">
-          Hi, here are today's job matches for <strong style="color: #e0e0f0;">${recipientEmail}</strong>:
+          Hi, here are your latest job matches for <strong style="color: #e0e0f0;">${recipientEmail}</strong>:
         </p>
 
         <!-- Jobs Table -->
@@ -77,8 +86,8 @@ function generateHtmlBody(jobs: Job[], recipientEmail: string, date: string): st
         <!-- CTA -->
         <table role="presentation" cellspacing="0" cellpadding="0" style="margin: 0 auto 32px;">
           <tr>
-            <td style="background: #2a2a4a; border-radius: 8px;">
-              <a href="${appUrl}/jobs" style="display: inline-block; padding: 12px 28px; color: #e0e0f0; text-decoration: none; font-size: 14px; font-weight: 600;">View all jobs on JobPilot</a>
+            <td style="background: linear-gradient(135deg, #4f46e5, #7c3aed); border-radius: 10px;">
+              <a href="${appUrl}/jobs" style="display: inline-block; padding: 14px 32px; color: #ffffff; text-decoration: none; font-size: 14px; font-weight: 600;">View all jobs on JobPilot</a>
             </td>
           </tr>
         </table>
@@ -100,19 +109,19 @@ function generateHtmlBody(jobs: Job[], recipientEmail: string, date: string): st
 }
 
 // ─── Generate plain text email body ──────────────────────────
-function generateTextBody(jobs: Job[], recipientEmail: string, date: string): string {
+function generateTextBody(jobs: EmailJob[], recipientEmail: string, date: string): string {
   const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
 
   const jobList = jobs
     .map(
       (job, i) =>
-        `${i + 1}. ${job.title} at ${job.company || 'Unknown'} — ${job.location || 'N/A'}\n   Apply: ${job.job_url}`
+        `${i + 1}. ${job.title} at ${job.company || 'Unknown'} — ${job.location || 'N/A'}\n   Source: ${job.source}\n   Apply: ${job.job_url}`
     )
     .join('\n\n');
 
   return `JobPilot Daily Digest — ${date}
 
-Hi, here are your job matches for today (${recipientEmail}):
+Hi, here are your job matches (${recipientEmail}):
 
 ${jobList}
 
@@ -123,10 +132,15 @@ To stop these emails, log in and turn off email digest in Settings.`;
 
 // ─── Send email digest ───────────────────────────────────────
 export async function sendDigestEmail(
-  jobs: Job[],
-  recipientEmail: string
+  recipientEmail: string,
+  jobs: EmailJob[]
 ): Promise<{ success: boolean; error?: string }> {
   try {
+    if (!process.env.GMAIL_USER || !process.env.GMAIL_APP_PASSWORD) {
+      console.warn('Gmail credentials not configured, skipping email');
+      return { success: false, error: 'Gmail not configured' };
+    }
+
     const transporter = createTransporter();
     const date = new Date().toLocaleDateString('en-IN', {
       weekday: 'long',
@@ -139,7 +153,7 @@ export async function sendDigestEmail(
       from: `"JobPilot" <${process.env.GMAIL_USER}>`,
       to: recipientEmail,
       replyTo: process.env.GMAIL_USER,
-      subject: `Your daily job digest — ${jobs.length} new jobs found — ${date}`,
+      subject: `Your job digest — ${jobs.length} jobs found — ${date}`,
       headers: {
         'X-Mailer': 'JobPilot/1.0',
         'X-Priority': '3',
