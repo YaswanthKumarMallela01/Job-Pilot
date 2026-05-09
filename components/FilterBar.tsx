@@ -78,6 +78,10 @@ export default function FilterBar({
           <option value="linkedin" className="bg-[#16162a]">LinkedIn</option>
           <option value="indeed" className="bg-[#16162a]">Indeed</option>
           <option value="remoteok" className="bg-[#16162a]">RemoteOK</option>
+          <option value="arbeitnow" className="bg-[#16162a]">Arbeitnow</option>
+          <option value="jobicy" className="bg-[#16162a]">Jobicy</option>
+          <option value="adzuna" className="bg-[#16162a]">Adzuna</option>
+          <option value="themuse" className="bg-[#16162a]">The Muse</option>
         </select>
 
         {/* View mode toggle */}

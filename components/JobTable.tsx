@@ -13,6 +13,10 @@ const SOURCE_BADGE: Record<JobSource, { label: string; classes: string }> = {
   linkedin: { label: 'LinkedIn', classes: 'bg-blue-500/10 text-blue-400' },
   indeed: { label: 'Indeed', classes: 'bg-purple-500/10 text-purple-400' },
   remoteok: { label: 'RemoteOK', classes: 'bg-teal-500/10 text-teal-400' },
+  arbeitnow: { label: 'Arbeitnow', classes: 'bg-orange-500/10 text-orange-400' },
+  jobicy: { label: 'Jobicy', classes: 'bg-cyan-500/10 text-cyan-400' },
+  adzuna: { label: 'Adzuna', classes: 'bg-lime-500/10 text-lime-400' },
+  themuse: { label: 'The Muse', classes: 'bg-pink-500/10 text-pink-400' },
 };
 
 export default function JobTable({ jobs, onStatusChange, updatingIds }: JobTableProps) {

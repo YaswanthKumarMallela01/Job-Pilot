@@ -6,7 +6,7 @@ import { getSupabase } from '@/lib/supabase';
 import type { Job } from '@/lib/types';
 import { PieChart, Pie, Cell, ResponsiveContainer, LineChart, Line, XAxis, YAxis, Tooltip, CartesianGrid } from 'recharts';
 
-const PIE_COLORS = ['#6366f1', '#8b5cf6', '#14b8a6'];
+const PIE_COLORS = ['#6366f1', '#8b5cf6', '#14b8a6', '#f97316', '#06b6d4', '#84cc16', '#ec4899'];
 
 export default function AnalyticsPage() {
   const router = useRouter();

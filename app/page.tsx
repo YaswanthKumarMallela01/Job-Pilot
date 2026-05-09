@@ -8,8 +8,8 @@ const FEATURES = [
         <line x1="21" y1="21" x2="16.65" y2="16.65" />
       </svg>
     ),
-    title: 'Auto-Search Daily',
-    description: 'Fetches jobs from LinkedIn, Indeed, and RemoteOK every morning — so you never miss a listing.',
+    title: 'Auto-Search 7 Sources',
+    description: 'Fetches jobs from LinkedIn, Indeed, RemoteOK, Arbeitnow, Jobicy, Adzuna, and The Muse — so you never miss a listing.',
   },
   {
     icon: (
@@ -95,8 +95,7 @@ export default function LandingPage() {
 
         {/* Subtitle */}
         <p className="animate-fade-in-up-delay-2 mx-auto mt-6 max-w-2xl text-lg text-slate-400 leading-relaxed sm:text-xl">
-          JobPilot searches LinkedIn, Indeed, and RemoteOK every morning, tracks your applications, and
-          delivers a clean daily digest to your inbox.
+          JobPilot searches 7 job boards every morning — LinkedIn, Indeed, RemoteOK, Arbeitnow, Jobicy, Adzuna, and The Muse — tracks your applications, and delivers a clean daily digest to your inbox.
         </p>
 
         {/* CTAs */}
@@ -127,7 +126,7 @@ export default function LandingPage() {
           </span>
           <span className="flex items-center gap-1.5">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M22 11.08V12a10 10 0 11-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
-            3 job sources
+            7 job sources
           </span>
           <span className="flex items-center gap-1.5">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M22 11.08V12a10 10 0 11-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>

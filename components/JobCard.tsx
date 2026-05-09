@@ -13,6 +13,10 @@ const SOURCE_BADGE: Record<JobSource, { label: string; classes: string }> = {
   linkedin: { label: 'LinkedIn', classes: 'bg-blue-500/10 text-blue-400 border-blue-500/20' },
   indeed: { label: 'Indeed', classes: 'bg-purple-500/10 text-purple-400 border-purple-500/20' },
   remoteok: { label: 'RemoteOK', classes: 'bg-teal-500/10 text-teal-400 border-teal-500/20' },
+  arbeitnow: { label: 'Arbeitnow', classes: 'bg-orange-500/10 text-orange-400 border-orange-500/20' },
+  jobicy: { label: 'Jobicy', classes: 'bg-cyan-500/10 text-cyan-400 border-cyan-500/20' },
+  adzuna: { label: 'Adzuna', classes: 'bg-lime-500/10 text-lime-400 border-lime-500/20' },
+  themuse: { label: 'The Muse', classes: 'bg-pink-500/10 text-pink-400 border-pink-500/20' },
 };
 
 export default function JobCard({ job, onStatusChange, isUpdating }: JobCardProps) {
