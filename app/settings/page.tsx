@@ -16,6 +16,7 @@ export default function SettingsPage() {
   const [experienceLevel, setExperienceLevel] = useState<ExperienceLevel>('any');
   const [email, setEmail] = useState('');
   const [emailDigestEnabled, setEmailDigestEnabled] = useState(true);
+  const [preferEstablished, setPreferEstablished] = useState(true);
   const [prefsId, setPrefsId] = useState<string | null>(null);
 
   useEffect(() => {
@@ -32,6 +33,7 @@ export default function SettingsPage() {
         setExperienceLevel(p.experience_level || 'any');
         setEmail(p.email || user.email || '');
         setEmailDigestEnabled(p.email_digest_enabled);
+        setPreferEstablished(p.prefer_established_companies !== false);
       } else { setEmail(user.email || ''); }
       setLoading(false);
     };
@@ -46,7 +48,7 @@ export default function SettingsPage() {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) { router.push('/login'); return; }
       const kw = keywords.split(',').map(k => k.trim()).filter(k => k.length > 0);
-      const payload = { user_id: user.id, keywords: kw, location, experience_level: experienceLevel, email, email_digest_enabled: emailDigestEnabled, updated_at: new Date().toISOString() };
+      const payload = { user_id: user.id, keywords: kw, location, experience_level: experienceLevel, email, email_digest_enabled: emailDigestEnabled, prefer_established_companies: preferEstablished, updated_at: new Date().toISOString() };
       if (prefsId) {
         const { error: e } = await supabase.from('user_preferences').update(payload).eq('id', prefsId);
         if (e) throw e;
@@ -116,6 +118,15 @@ export default function SettingsPage() {
           <div><p className="text-sm font-semibold text-white">Email Digest</p><p className="text-xs text-slate-500 mt-0.5">Receive daily email with new job matches</p></div>
           <button type="button" onClick={() => setEmailDigestEnabled(!emailDigestEnabled)} role="switch" aria-checked={emailDigestEnabled} className={`relative inline-flex h-7 w-12 rounded-full border-2 border-transparent transition-colors ${emailDigestEnabled ? 'bg-indigo-500' : 'bg-white/10'}`}>
             <span className={`inline-block h-6 w-6 rounded-full bg-white shadow transition-transform ${emailDigestEnabled ? 'translate-x-5' : 'translate-x-0'}`} />
+          </button>
+        </div>
+        <div className="rounded-2xl border border-white/[0.06] bg-[#12121f]/40 p-5 flex items-center justify-between">
+          <div>
+            <p className="text-sm font-semibold text-white">Prefer Established Companies</p>
+            <p className="text-xs text-slate-500 mt-0.5">Prioritize jobs from well-known companies (FAANG, top tech, Indian IT leaders, unicorns)</p>
+          </div>
+          <button type="button" onClick={() => setPreferEstablished(!preferEstablished)} role="switch" aria-checked={preferEstablished} className={`relative inline-flex h-7 w-12 flex-shrink-0 rounded-full border-2 border-transparent transition-colors ${preferEstablished ? 'bg-indigo-500' : 'bg-white/10'}`}>
+            <span className={`inline-block h-6 w-6 rounded-full bg-white shadow transition-transform ${preferEstablished ? 'translate-x-5' : 'translate-x-0'}`} />
           </button>
         </div>
         <button type="submit" disabled={saving} className="w-full rounded-xl bg-gradient-to-r from-indigo-500 to-violet-600 px-4 py-3 text-sm font-semibold text-white shadow-lg shadow-indigo-500/20 hover:shadow-indigo-500/30 hover:brightness-110 disabled:opacity-50 disabled:cursor-not-allowed">

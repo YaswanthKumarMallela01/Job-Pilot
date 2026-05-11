@@ -95,8 +95,8 @@ export default function LandingPage() {
 
         {/* Subtitle */}
         <p className="animate-fade-in-up-delay-2 mx-auto mt-6 max-w-2xl text-lg text-slate-400 leading-relaxed sm:text-xl">
-          JobPilot searches 8 job boards every morning — LinkedIn, Indeed, RemoteOK, Unstop, Jobicy, Adzuna, The Muse, and Arbeitnow — tracks your applications, and delivers a clean daily digest to your inbox.
-        </p>
+        JobPilot searches LinkedIn and Unstop every morning with smart relevance matching — filters out irrelevant results, prioritizes top companies, tracks your applications, and delivers a clean daily digest to your inbox.
+      </p>
 
         {/* CTAs */}
         <div className="animate-fade-in-up-delay-3 mt-10 flex flex-col sm:flex-row items-center justify-center gap-4">
@@ -126,7 +126,7 @@ export default function LandingPage() {
           </span>
           <span className="flex items-center gap-1.5">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M22 11.08V12a10 10 0 11-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
-            8 job sources
+            Smart relevance filtering
           </span>
           <span className="flex items-center gap-1.5">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M22 11.08V12a10 10 0 11-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>

@@ -33,6 +33,7 @@ export interface UserPreferences {
   experience_level: ExperienceLevel;
   email: string;
   email_digest_enabled: boolean;
+  prefer_established_companies: boolean;
   created_at: string;
   updated_at: string;
 }

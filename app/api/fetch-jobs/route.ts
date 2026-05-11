@@ -33,7 +33,7 @@ export async function POST(req: NextRequest) {
 
       try {
         // Fetch jobs for this user's keywords
-        const rawJobs = await fetchAllJobs(prefs.keywords, prefs.location || 'India, Remote', prefs.experience_level || 'any');
+        const rawJobs = await fetchAllJobs(prefs.keywords, prefs.location || 'India, Remote', prefs.experience_level || 'any', prefs.prefer_established_companies !== false);
 
         // Get existing job URLs for this user
         const { data: existingJobs } = await supabase

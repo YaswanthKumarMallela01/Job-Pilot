@@ -34,7 +34,7 @@ export async function POST(req: NextRequest) {
     }
 
     // Fetch jobs from LinkedIn + Unstop using user's preferences
-    const rawJobs = await fetchAllJobs(userPrefs.keywords, userPrefs.location || 'India, Remote', userPrefs.experience_level || 'any');
+    const rawJobs = await fetchAllJobs(userPrefs.keywords, userPrefs.location || 'India, Remote', userPrefs.experience_level || 'any', userPrefs.prefer_established_companies !== false);
 
     // Get existing job URLs for this user to deduplicate
     const { data: existingJobs } = await supabase
