@@ -407,10 +407,84 @@ export async function fetchUnstopJobs(keyword: string, experience: ExperienceLev
 interface ScoredJob extends RawJob {
   relevanceScore: number;
   companyTier: number;
+  experienceMatch: number; // 0-1: how well it matches the requested experience level
   combinedScore: number;
 }
 
-// ─── Fetch all jobs — smart relevance + company scoring ──────
+// ─── Experience-level signals in job titles ──────────────────
+const INTERN_SIGNALS = ['intern', 'internship', 'trainee', 'apprentice', 'fresher', 'fresh graduate', 'graduate trainee', 'co-op', 'coop', 'summer analyst', 'summer associate', 'placement'];
+const ENTRY_SIGNALS = ['junior', 'jr', 'entry level', 'entry-level', 'associate', 'graduate', 'fresher', 'new grad', 'campus', 'trainee', 'intern'];
+const SENIOR_SIGNALS = ['senior', 'sr', 'staff', 'principal', 'lead', 'architect', 'director', 'vp', 'vice president', 'head of', 'chief', 'cto', 'cio', 'distinguished', 'fellow'];
+const MID_SIGNALS = ['mid', 'mid-level', 'mid level', 'ii', 'iii', 'level 2', 'level 3', 'l3', 'l4', 'l5'];
+const YEARS_EXP_REGEX = /(\d+)\+?\s*(?:years?|yrs?)\s*(?:of\s+)?(?:experience|exp)/i;
+
+/**
+ * Score how well a job matches the requested experience level (0.0 to 1.0).
+ * Returns 1.0 for perfect match, 0.0 for clear mismatch, 0.5 for uncertain.
+ */
+function scoreExperienceMatch(title: string, description: string, level: ExperienceLevel): number {
+  if (level === 'any') return 1.0;
+
+  const text = `${title} ${description}`.toLowerCase();
+  const titleLower = title.toLowerCase();
+
+  // Check years of experience mentioned
+  const yearsMatch = YEARS_EXP_REGEX.exec(text);
+  const yearsRequired = yearsMatch ? parseInt(yearsMatch[1], 10) : -1;
+
+  const hasInternSignal = INTERN_SIGNALS.some(s => titleLower.includes(s));
+  const hasEntrySignal = ENTRY_SIGNALS.some(s => titleLower.includes(s));
+  const hasSeniorSignal = SENIOR_SIGNALS.some(s => matchesAsWord(titleLower, s));
+  const hasMidSignal = MID_SIGNALS.some(s => titleLower.includes(s));
+
+  switch (level) {
+    case 'internship': {
+      // Perfect: title has intern signals
+      if (hasInternSignal) return 1.0;
+      // Hard reject: title clearly says senior/lead/staff/principal/director
+      if (hasSeniorSignal) return 0.0;
+      // Hard reject: requires 3+ years experience
+      if (yearsRequired >= 3) return 0.0;
+      // Reject: has mid-level signals
+      if (hasMidSignal) return 0.0;
+      // Penalize but don't reject: no intern signal but no senior signal either
+      // (e.g., "LLM Developer" — could be any level, but probably not intern)
+      // Check description for intern signals
+      const descHasInternSignal = INTERN_SIGNALS.some(s => text.includes(s));
+      if (descHasInternSignal) return 0.8;
+      // No signals at all — this is likely a full-time role
+      return 0.15;
+    }
+    case 'entry': {
+      if (hasInternSignal || hasEntrySignal) return 1.0;
+      if (hasSeniorSignal) return 0.1;
+      if (yearsRequired >= 5) return 0.0;
+      if (hasMidSignal) return 0.3;
+      // No signals — probably entry-friendly
+      return 0.6;
+    }
+    case 'mid': {
+      if (hasMidSignal) return 1.0;
+      if (hasSeniorSignal) return 0.5;
+      if (hasInternSignal) return 0.1;
+      if (yearsRequired >= 2 && yearsRequired <= 7) return 0.9;
+      // No signals — could be mid
+      return 0.6;
+    }
+    case 'senior': {
+      if (hasSeniorSignal) return 1.0;
+      if (hasInternSignal) return 0.0;
+      if (hasEntrySignal) return 0.1;
+      if (yearsRequired >= 5) return 0.9;
+      // No signals — could be senior
+      return 0.5;
+    }
+    default:
+      return 1.0;
+  }
+}
+
+// ─── Fetch all jobs — smart relevance + company + experience scoring ─
 export async function fetchAllJobs(
   keywords: string[],
   location: string,
@@ -431,10 +505,15 @@ export async function fetchAllJobs(
   const linkedInJobs: RawJob[] = [];
   const unstopJobs: RawJob[] = [];
 
+  // For internship searches, also add "intern" to search queries for better API results
+  const effectiveQueries = experience === 'internship'
+    ? [...new Set([...searchQueries, ...searchQueries.map(q => `${q} intern`)])]
+    : searchQueries;
+
   // Process in batches of 5 to avoid overwhelming APIs
   const BATCH_SIZE = 5;
-  for (let i = 0; i < searchQueries.length; i += BATCH_SIZE) {
-    const batch = searchQueries.slice(i, i + BATCH_SIZE);
+  for (let i = 0; i < effectiveQueries.length; i += BATCH_SIZE) {
+    const batch = effectiveQueries.slice(i, i + BATCH_SIZE);
     const promises = batch.flatMap(query => [
       fetchLinkedInJobs(query, locationStr, experience, pageOffset),
       fetchUnstopJobs(query, experience, pageOffset),
@@ -460,27 +539,30 @@ export async function fetchAllJobs(
   const allJobs = dedup([...linkedInJobs, ...unstopJobs]);
   console.log(`[JobPilot] Total unique jobs fetched: ${allJobs.length}`);
 
-  // Step 4: Score each job for relevance + company quality
-  const RELEVANCE_THRESHOLD = 0.35; // Must match at least 35% of a keyword phrase's core terms
+  // Step 4: Score each job for relevance + company quality + experience match
+  const RELEVANCE_THRESHOLD = 0.35;
+  const EXPERIENCE_THRESHOLD = 0.15; // Hard floor — anything below is completely wrong level
 
   const scoredJobs: ScoredJob[] = allJobs.map(job => {
     const relevanceScore = scoreJobRelevance(job.title, job.description || '', keywords);
     const companyTier = getCompanyTier(job.company);
+    const experienceMatch = scoreExperienceMatch(job.title, job.description || '', experience);
 
-    // Combined score: relevance is king, company tier is a tiebreaker
-    // Relevance: 0-1 range, weighted heavily
-    // Company tier: 0-3 range, normalized to 0-0.3
-    let combinedScore = relevanceScore * 3;
+    // Combined score: relevance * experience * company
+    // Experience acts as a multiplier — wrong level tanks the score
+    let combinedScore = relevanceScore * 3 * (0.4 + experienceMatch * 0.6);
     if (preferEstablished) {
       combinedScore += companyTier * 0.3;
     }
 
-    return { ...job, relevanceScore, companyTier, combinedScore };
+    return { ...job, relevanceScore, companyTier, experienceMatch, combinedScore };
   });
 
-  // Step 5: Filter out irrelevant jobs
-  const relevantJobs = scoredJobs.filter(j => j.relevanceScore >= RELEVANCE_THRESHOLD);
-  console.log(`[JobPilot] Jobs passing relevance threshold (${RELEVANCE_THRESHOLD}): ${relevantJobs.length}/${scoredJobs.length}`);
+  // Step 5: Filter out irrelevant jobs AND wrong experience level
+  const relevantJobs = scoredJobs.filter(j =>
+    j.relevanceScore >= RELEVANCE_THRESHOLD && j.experienceMatch > EXPERIENCE_THRESHOLD
+  );
+  console.log(`[JobPilot] After relevance (${RELEVANCE_THRESHOLD}) + experience filter: ${relevantJobs.length}/${scoredJobs.length}`);
 
   // Step 6: Sort by combined score (highest first)
   relevantJobs.sort((a, b) => b.combinedScore - a.combinedScore);
@@ -512,5 +594,5 @@ export async function fetchAllJobs(
   const result = locFiltered.length >= 10 ? locFiltered : finalJobs;
 
   // Strip scoring metadata before returning
-  return result.slice(0, MAX_JOBS).map(({ relevanceScore, companyTier, combinedScore, ...job }) => job);
+  return result.slice(0, MAX_JOBS).map(({ relevanceScore, companyTier, experienceMatch, combinedScore, ...job }) => job);
 }
