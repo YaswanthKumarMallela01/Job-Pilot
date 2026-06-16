@@ -19,6 +19,9 @@ export default function JobsPage() {
   const [searching, setSearching] = useState(false);
   const [searchResult, setSearchResult] = useState<{ success: boolean; message: string } | null>(null);
 
+  // Bulk actions state
+  const [bulkDeleting, setBulkDeleting] = useState(false);
+
   // Filters
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState<JobStatus | 'all'>('all');
@@ -59,9 +62,8 @@ export default function JobsPage() {
       if (res.ok) {
         setSearchResult({
           success: true,
-          message: `Found ${data.total_found} jobs across ${data.sources_checked} sources. ${data.new_jobs} new jobs added.${data.email_sent ? ' Email digest sent!' : ''}`,
+          message: `Found ${data.total_found} quality jobs from verified companies. ${data.new_jobs} new jobs added.${data.email_sent ? ' Email digest sent!' : ''}`,
         });
-        // Refresh the job list
         await fetchJobs();
       } else {
         setSearchResult({ success: false, message: data.error || 'Search failed.' });
@@ -101,6 +103,27 @@ export default function JobsPage() {
     }
   };
 
+  // ─── Bulk Delete (filtered jobs) ──────────────────────────
+  const handleBulkDelete = async () => {
+    if (!userId) return;
+    const toDelete = filteredJobs;
+    if (toDelete.length === 0) return;
+    if (!confirm(`Delete ${toDelete.length} filtered job${toDelete.length > 1 ? 's' : ''}? This cannot be undone.`)) return;
+
+    setBulkDeleting(true);
+    try {
+      const supabase = getSupabase();
+      const ids = toDelete.map(j => j.id);
+      const { error } = await supabase.from('jobs').delete().in('id', ids);
+      if (!error) {
+        setJobs(prev => prev.filter(j => !ids.includes(j.id)));
+      }
+    } catch (err) {
+      console.error('Bulk delete error:', err);
+    }
+    setBulkDeleting(false);
+  };
+
   // ─── Export to CSV ─────────────────────────────────────────
   const handleExportCSV = () => {
     const headers = ['Title', 'Company', 'Location', 'Source', 'Status', 'Date Found', 'Job URL', 'Notes'];
@@ -128,7 +151,8 @@ export default function JobsPage() {
   const filteredJobs = jobs.filter(job => {
     const matchesSearch = search === '' ||
       job.title.toLowerCase().includes(search.toLowerCase()) ||
-      (job.company || '').toLowerCase().includes(search.toLowerCase());
+      (job.company || '').toLowerCase().includes(search.toLowerCase()) ||
+      (job.location || '').toLowerCase().includes(search.toLowerCase());
     const matchesStatus = statusFilter === 'all' || job.status === statusFilter;
     const matchesSource = sourceFilter === 'all' || job.source === sourceFilter;
     return matchesSearch && matchesStatus && matchesSource;
@@ -146,19 +170,27 @@ export default function JobsPage() {
 
   return (
     <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
-      {/* Header with Search Now + Export */}
+      {/* Header with Search Now + Export + Bulk Delete */}
       <div className="mb-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold text-white sm:text-3xl">Job Dashboard</h1>
-          <p className="mt-1 text-sm text-slate-400">Track and manage your job applications in one place</p>
+          <p className="mt-1 text-sm text-slate-400">Quality jobs from 500+ verified companies</p>
         </div>
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2 flex-wrap">
+          {/* Bulk Delete */}
+          <button onClick={handleBulkDelete} disabled={filteredJobs.length === 0 || bulkDeleting}
+            className="inline-flex items-center gap-1.5 rounded-xl border border-red-500/20 bg-red-500/5 px-3 py-2.5 text-xs font-medium text-red-400 hover:bg-red-500/10 hover:text-red-300 transition-all disabled:opacity-30 disabled:cursor-not-allowed"
+            title="Delete all filtered jobs">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2"/></svg>
+            {bulkDeleting ? 'Deleting...' : `Delete ${filteredJobs.length > 0 ? `(${filteredJobs.length})` : ''}`}
+          </button>
+
           {/* Export CSV */}
           <button onClick={handleExportCSV} disabled={filteredJobs.length === 0}
-            className="inline-flex items-center gap-2 rounded-xl border border-white/[0.06] bg-white/[0.03] px-4 py-2.5 text-sm font-medium text-slate-300 hover:bg-white/[0.06] hover:text-white transition-all disabled:opacity-40 disabled:cursor-not-allowed"
+            className="inline-flex items-center gap-1.5 rounded-xl border border-white/[0.06] bg-white/[0.03] px-3 py-2.5 text-xs font-medium text-slate-300 hover:bg-white/[0.06] hover:text-white transition-all disabled:opacity-30 disabled:cursor-not-allowed"
             title="Export filtered jobs to CSV">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
-            Export CSV
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+            Export
           </button>
 
           {/* Search Jobs Now */}

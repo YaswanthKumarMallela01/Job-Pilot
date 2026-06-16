@@ -2,6 +2,7 @@
 
 import type { Job, JobStatus, JobSource } from '@/lib/types';
 import StatusDropdown from './StatusDropdown';
+import { getCompanyTier, getCompanyTierLabel } from '@/lib/companies';
 
 interface JobCardProps {
   job: Job;
@@ -13,6 +14,7 @@ interface JobCardProps {
 const SOURCE_BADGE: Record<JobSource, { label: string; classes: string }> = {
   linkedin: { label: 'LinkedIn', classes: 'bg-blue-500/10 text-blue-400 border-blue-500/20' },
   unstop: { label: 'Unstop', classes: 'bg-rose-500/10 text-rose-400 border-rose-500/20' },
+  jsearch: { label: 'JSearch', classes: 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20' },
 };
 
 export default function JobCard({ job, onStatusChange, onDelete, isUpdating }: JobCardProps) {
@@ -20,6 +22,9 @@ export default function JobCard({ job, onStatusChange, onDelete, isUpdating }: J
     label: job.source,
     classes: 'bg-slate-500/10 text-slate-400 border-slate-500/20',
   };
+
+  const tier = getCompanyTier(job.company || '');
+  const tierInfo = getCompanyTierLabel(tier);
 
   const dateFound = new Date(job.date_found).toLocaleDateString('en-IN', {
     day: 'numeric',
@@ -56,15 +61,25 @@ export default function JobCard({ job, onStatusChange, onDelete, isUpdating }: J
         {job.title}
       </h3>
 
-      {/* Company + Location */}
-      <p className="mb-3 text-sm text-slate-400">
-        {job.company || 'Unknown'}{' '}
+      {/* Company + Tier + Location */}
+      <div className="mb-3 flex items-center gap-2">
+        <span className="text-sm text-slate-400">
+          {job.company || 'Unknown'}
+        </span>
+        {tier > 0 && (
+          <span
+            className={`text-[10px] font-bold ${tierInfo.color}`}
+            title={tier === 3 ? 'Top Company' : tier === 2 ? 'Well Known' : 'Established'}
+          >
+            {tierInfo.label}
+          </span>
+        )}
         {job.location && (
-          <span className="text-slate-500">
+          <span className="text-xs text-slate-500">
             &bull; {job.location}
           </span>
         )}
-      </p>
+      </div>
 
       {/* Description */}
       {job.description && (

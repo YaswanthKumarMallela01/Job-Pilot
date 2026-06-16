@@ -101,7 +101,7 @@ export async function POST(req: NextRequest) {
       total_found: rawJobs.length,
       new_jobs: insertedCount,
       duplicates_skipped: rawJobs.length - insertedCount,
-      sources_checked: 2,
+      sources_checked: process.env.RAPIDAPI_KEY ? 3 : 2,
       email_sent: emailSent,
     });
   } catch (err) {

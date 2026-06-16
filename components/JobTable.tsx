@@ -2,6 +2,7 @@
 
 import type { Job, JobStatus, JobSource } from '@/lib/types';
 import StatusDropdown from './StatusDropdown';
+import { getCompanyTier, getCompanyTierLabel } from '@/lib/companies';
 
 interface JobTableProps {
   jobs: Job[];
@@ -13,7 +14,28 @@ interface JobTableProps {
 const SOURCE_BADGE: Record<JobSource, { label: string; classes: string }> = {
   linkedin: { label: 'LinkedIn', classes: 'bg-blue-500/10 text-blue-400' },
   unstop: { label: 'Unstop', classes: 'bg-rose-500/10 text-rose-400' },
+  jsearch: { label: 'JSearch', classes: 'bg-emerald-500/10 text-emerald-400' },
 };
+
+function CompanyCell({ company }: { company: string | null }) {
+  const name = company || 'Unknown';
+  const tier = getCompanyTier(name);
+  const tierInfo = getCompanyTierLabel(tier);
+
+  return (
+    <div className="flex items-center gap-2">
+      <span className="text-sm text-slate-400">{name}</span>
+      {tier > 0 && (
+        <span
+          className={`text-[10px] font-bold ${tierInfo.color}`}
+          title={tier === 3 ? 'Top Company' : tier === 2 ? 'Well Known' : 'Established'}
+        >
+          {tierInfo.label}
+        </span>
+      )}
+    </div>
+  );
+}
 
 export default function JobTable({ jobs, onStatusChange, onDelete, updatingIds }: JobTableProps) {
   if (jobs.length === 0) {
@@ -58,7 +80,9 @@ export default function JobTable({ jobs, onStatusChange, onDelete, updatingIds }
                   <span className="text-sm font-medium text-white">{job.title}</span>
                   <span className="block sm:hidden text-xs text-slate-500 mt-0.5">{job.company || 'Unknown'}</span>
                 </td>
-                <td className="px-5 py-4 text-sm text-slate-400 hidden sm:table-cell">{job.company || 'Unknown'}</td>
+                <td className="px-5 py-4 hidden sm:table-cell">
+                  <CompanyCell company={job.company} />
+                </td>
                 <td className="px-5 py-4 text-sm text-slate-400 hidden md:table-cell">{job.location || 'N/A'}</td>
                 <td className="px-5 py-4 hidden lg:table-cell">
                   <span className={`inline-block rounded-full px-2.5 py-0.5 text-[11px] font-semibold uppercase tracking-wider ${badge.classes}`}>

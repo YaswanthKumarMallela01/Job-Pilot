@@ -2,7 +2,7 @@
 export type JobStatus = 'new' | 'saved' | 'applied' | 'interview' | 'rejected';
 
 // ─── Job Source ──────────────────────────────────────────────
-export type JobSource = 'linkedin' | 'unstop';
+export type JobSource = 'linkedin' | 'unstop' | 'jsearch';
 
 // ─── Experience Level ────────────────────────────────────────
 export type ExperienceLevel = 'internship' | 'entry' | 'mid' | 'senior' | 'any';

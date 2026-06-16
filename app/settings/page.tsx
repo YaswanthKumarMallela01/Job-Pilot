@@ -122,8 +122,8 @@ export default function SettingsPage() {
         </div>
         <div className="rounded-2xl border border-white/[0.06] bg-[#12121f]/40 p-5 flex items-center justify-between">
           <div>
-            <p className="text-sm font-semibold text-white">Prefer Established Companies</p>
-            <p className="text-xs text-slate-500 mt-0.5">Prioritize jobs from well-known companies (FAANG, top tech, Indian IT leaders, unicorns)</p>
+            <p className="text-sm font-semibold text-white">Top Companies Only</p>
+            <p className="text-xs text-slate-500 mt-0.5">Only show jobs from 500+ verified companies (FAANG, top tech, Indian IT, unicorns, funded startups, MNCs). Filters out unknown/fraud companies completely.</p>
           </div>
           <button type="button" onClick={() => setPreferEstablished(!preferEstablished)} role="switch" aria-checked={preferEstablished} className={`relative inline-flex h-7 w-12 flex-shrink-0 rounded-full border-2 border-transparent transition-colors ${preferEstablished ? 'bg-indigo-500' : 'bg-white/10'}`}>
             <span className={`inline-block h-6 w-6 rounded-full bg-white shadow transition-transform ${preferEstablished ? 'translate-x-5' : 'translate-x-0'}`} />
